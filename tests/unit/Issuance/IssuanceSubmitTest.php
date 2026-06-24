@@ -7,6 +7,8 @@ use PortoSender\Issuance\IssuanceService;
 use PortoSender\Issuance\ConfirmLinkBuilder;
 use PortoSender\Captcha\CaptchaVerifier;
 use PortoSender\Limiting\RequestLimiter;
+use PortoSender\Limiting\RateLimiter;
+use PortoSender\Tests\unit\Limiting\InMemoryRateCounterStore;
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Requests\RequestStore;
 use PortoSender\Mail\MailerInterface;
@@ -26,13 +28,15 @@ final class IssuanceSubmitTest extends MockeryTestCase
         $mailer = $mocks['mailer'] ?? Mockery::mock(MailerInterface::class);
         $limiterStore = Mockery::mock(RequestStore::class)->shouldReceive('hasPriorRequest')->andReturn(false)->getMock();
         $limiter = $mocks['limiter'] ?? new RequestLimiter($limiterStore);
+        $settings = $mocks['settings'] ?? new Settings(['enabled_products' => ['grossbrief']]);
         $clock = Mockery::mock(Clock::class);
         $clock->shouldReceive('now')->andReturn(new \DateTimeImmutable('2026-06-24 10:00:00'));
+        $rateLimiter = $mocks['rateLimiter'] ?? new RateLimiter(new InMemoryRateCounterStore(), $settings, $clock);
         $svc = new IssuanceService(
-            $captcha, $limiter, $codes, $requests, $mailer,
+            $captcha, $limiter, $rateLimiter, $codes, $requests, $mailer,
             new Hasher('salt'), new TokenGenerator(),
             Mockery::mock(ConfirmLinkBuilder::class)->shouldReceive('build')->andReturn('https://x.test/c?token=t')->getMock(),
-            new Settings(['enabled_products' => ['grossbrief']]), ProductCatalog::default(), $clock
+            $settings, ProductCatalog::default(), $clock
         );
         return [$svc, compact('captcha', 'requests', 'codes', 'mailer')];
     }
@@ -80,5 +84,16 @@ final class IssuanceSubmitTest extends MockeryTestCase
         $m['requests']->shouldNotReceive('createPending');
         $m['mailer']->shouldNotReceive('sendConfirmation');
         $this->assertSame('out_of_stock', $svc->submit($this->input())['status']);
+    }
+
+    public function test_rate_limited(): void
+    {
+        // per-IP limit 0 => the very first request is over the cap.
+        [$svc, $m] = $this->service(['settings' => new Settings([
+            'enabled_products' => ['grossbrief'], 'rate_limit_per_ip_day' => 0,
+        ])]);
+        $m['requests']->shouldNotReceive('createPending');
+        $m['mailer']->shouldNotReceive('sendConfirmation');
+        $this->assertSame('rate_limited', $svc->submit($this->input())['status']);
     }
 }

@@ -9,7 +9,7 @@ use PortoSender\Postage\ProductCatalog;
 use PortoSender\Support\{Hasher, TokenGenerator, SystemClock};
 use PortoSender\Inventory\{CodeRepository, StockAlerter};
 use PortoSender\Requests\RequestRepository;
-use PortoSender\Limiting\RequestLimiter;
+use PortoSender\Limiting\{RequestLimiter, RateLimiter, TransientRateCounterStore};
 use PortoSender\Captcha\{AltchaVerifier, NullVerifier, CaptchaVerifier};
 use PortoSender\Mail\Mailer;
 use PortoSender\Issuance\{IssuanceService, UrlConfirmLinkBuilder};
@@ -44,7 +44,9 @@ final class Plugin
         $codes = new CodeRepository($wpdb);
         $requests = new RequestRepository($wpdb);
         return new IssuanceService(
-            self::captcha($s), new RequestLimiter($requests), $codes, $requests, new Mailer($s),
+            self::captcha($s), new RequestLimiter($requests),
+            new RateLimiter(new TransientRateCounterStore(), $s, new SystemClock()),
+            $codes, $requests, new Mailer($s),
             new Hasher($s->hashSalt()), new TokenGenerator(), new UrlConfirmLinkBuilder(),
             $s, ProductCatalog::default(), new SystemClock()
         );

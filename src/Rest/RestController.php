@@ -36,7 +36,11 @@ final class RestController
             'captcha' => (string) $request->get_param('captcha'),
             'ip' => isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '',
         ]);
-        $httpStatus = $result['status'] === 'confirmation_sent' ? 200 : 422;
+        $httpStatus = match ($result['status']) {
+            'confirmation_sent' => 200,
+            'rate_limited' => 429,
+            default => 422,
+        };
         return new \WP_REST_Response($result, $httpStatus);
     }
 

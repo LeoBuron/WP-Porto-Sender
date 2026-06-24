@@ -8,6 +8,8 @@ use PortoSender\Issuance\IssuanceService;
 use PortoSender\Issuance\UrlConfirmLinkBuilder;
 use PortoSender\Captcha\NullVerifier;
 use PortoSender\Limiting\RequestLimiter;
+use PortoSender\Limiting\RateLimiter;
+use PortoSender\Limiting\TransientRateCounterStore;
 use PortoSender\Mail\Mailer;
 use PortoSender\Support\{Hasher, TokenGenerator, SystemClock};
 use PortoSender\Settings\Settings;
@@ -23,8 +25,9 @@ final class RequestFlowTest extends PortoTestCase
         $requests = new RequestRepository($wpdb);
         $settings = new Settings(['enabled_products' => ['grossbrief'], 'owner_address' => 'Leo, 12345 Stadt']);
         $svc = new IssuanceService(
-            new NullVerifier(), new RequestLimiter($requests), $codes, $requests,
-            new Mailer($settings), new Hasher('salt'), new TokenGenerator(),
+            new NullVerifier(), new RequestLimiter($requests),
+            new RateLimiter(new TransientRateCounterStore(), $settings, new SystemClock()),
+            $codes, $requests, new Mailer($settings), new Hasher('salt'), new TokenGenerator(),
             new UrlConfirmLinkBuilder(), $settings, ProductCatalog::default(), new SystemClock()
         );
         return [$svc, $codes, $requests];
@@ -96,5 +99,31 @@ final class RequestFlowTest extends PortoTestCase
         $req->set_body_params(['name' => 'Vera', 'email' => 'v@example.de', 'product' => 'grossbrief', 'captcha' => 'x']);
         $res = rest_do_request($req);
         $this->assertSame('confirmation_sent', $res->get_data()['status']);
+    }
+
+    public function test_rest_submit_is_rate_limited_after_per_ip_cap(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '203.0.113.5';
+        [$svc, $codes] = $this->service(); // default settings => 3/day per IP
+        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['RLCODE1']);
+        $controller = new \PortoSender\Rest\RestController($svc, new NullVerifier());
+        $controller->register();
+        global $wp_rest_server;
+        $wp_rest_server = new \WP_REST_Server();
+        do_action('rest_api_init');
+
+        $submit = static function () {
+            $req = new \WP_REST_Request('POST', '/porto/v1/request');
+            $req->set_body_params(['name' => 'Vera', 'email' => 'v@example.de', 'product' => 'grossbrief', 'captcha' => 'x']);
+            return rest_do_request($req);
+        };
+
+        // Dedup ignores pending rows, so the first three all pass; the 4th trips the per-IP cap.
+        $this->assertSame('confirmation_sent', $submit()->get_data()['status']);
+        $this->assertSame('confirmation_sent', $submit()->get_data()['status']);
+        $this->assertSame('confirmation_sent', $submit()->get_data()['status']);
+        $res = $submit();
+        $this->assertSame('rate_limited', $res->get_data()['status']);
+        $this->assertSame(429, $res->get_status());
     }
 }

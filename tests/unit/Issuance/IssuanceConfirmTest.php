@@ -7,6 +7,8 @@ use PortoSender\Issuance\IssuanceService;
 use PortoSender\Issuance\ConfirmLinkBuilder;
 use PortoSender\Captcha\NullVerifier;
 use PortoSender\Limiting\RequestLimiter;
+use PortoSender\Limiting\RateLimiter;
+use PortoSender\Tests\unit\Limiting\InMemoryRateCounterStore;
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Requests\RequestStore;
 use PortoSender\Mail\MailerInterface;
@@ -24,10 +26,12 @@ final class IssuanceConfirmTest extends MockeryTestCase
         $this->hasher = new Hasher('salt');
         $clock = Mockery::mock(Clock::class);
         $clock->shouldReceive('now')->andReturn(new \DateTimeImmutable('2026-06-24 10:00:00'));
+        $settings = new Settings();
         return new IssuanceService(
             new NullVerifier(), new RequestLimiter(Mockery::mock(RequestStore::class)),
+            new RateLimiter(new InMemoryRateCounterStore(), $settings, $clock),
             $codes, $requests, $mailer, $this->hasher, new TokenGenerator(),
-            Mockery::mock(ConfirmLinkBuilder::class), new Settings(), ProductCatalog::default(), $clock
+            Mockery::mock(ConfirmLinkBuilder::class), $settings, ProductCatalog::default(), $clock
         );
     }
 

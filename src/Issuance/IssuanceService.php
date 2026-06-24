@@ -4,6 +4,7 @@ namespace PortoSender\Issuance;
 
 use PortoSender\Captcha\CaptchaVerifier;
 use PortoSender\Limiting\RequestLimiter;
+use PortoSender\Limiting\RateLimiter;
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Requests\RequestStore;
 use PortoSender\Mail\MailerInterface;
@@ -18,6 +19,7 @@ final class IssuanceService
     public function __construct(
         private CaptchaVerifier $captcha,
         private RequestLimiter $limiter,
+        private RateLimiter $rateLimiter,
         private CodeStore $codes,
         private RequestStore $requests,
         private MailerInterface $mailer,
@@ -42,6 +44,9 @@ final class IssuanceService
         }
         if (!$this->captcha->verify((string) ($input['captcha'] ?? ''))) {
             return ['status' => 'captcha_failed'];
+        }
+        if (!$this->rateLimiter->check($this->hasher->ip((string) ($input['ip'] ?? '')))) {
+            return ['status' => 'rate_limited'];
         }
 
         $emailHash = $this->hasher->email($email);
