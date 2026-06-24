@@ -67,4 +67,47 @@ final class IssuanceService
 
         return ['status' => 'confirmation_sent'];
     }
+
+    private const MAX_CLAIM_ATTEMPTS = 3;
+
+    /** @return array{status:string} */
+    public function confirm(string $token): array
+    {
+        $req = $this->requests->findByTokenHash($this->hasher->token($token));
+        if ($req === null || in_array($req->status, ['rejected'], true)) {
+            return ['status' => 'invalid_token'];
+        }
+        if ($req->status === 'issued') {
+            return ['status' => 'already_issued'];
+        }
+        if (!in_array($req->status, ['pending', 'confirmed'], true)) {
+            return ['status' => 'invalid_token'];
+        }
+
+        $now = $this->clock->now();
+        $expiresAt = (new \DateTimeImmutable($req->created_at))->modify('+' . $this->settings->confirmTokenTtlHours() . ' hours');
+        if ($now > $expiresAt) {
+            return ['status' => 'expired'];
+        }
+
+        $this->requests->markConfirmed((int) $req->id, $now); // no-op if already confirmed
+
+        $codeId = null;
+        for ($i = 0; $i < self::MAX_CLAIM_ATTEMPTS; $i++) {
+            $codeId = $this->codes->claimOne($req->product, $now, $this->settings->reservationTtlMinutes());
+            if ($codeId !== null) { break; }
+        }
+        if ($codeId === null) {
+            return ['status' => 'out_of_stock'];
+        }
+
+        $this->codes->markIssued($codeId, (int) $req->id, (string) $req->email_hash, $now);
+        $this->requests->markIssued((int) $req->id, $codeId, $now);
+
+        $code = $this->codes->getCode($codeId);
+        $product = $this->catalog->get($req->product);
+        $this->mailer->sendDelivery((string) $req->email, (string) $req->name, (string) $code->code, $product);
+
+        return ['status' => 'issued'];
+    }
 }
