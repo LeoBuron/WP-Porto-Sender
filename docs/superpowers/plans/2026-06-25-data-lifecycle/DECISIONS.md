@@ -62,6 +62,12 @@ explicit user action) are implemented **disabled-by-default behind a setting** a
   product/date/value is the real gap vs the textarea (one product/date per batch); letting users set
   arbitrary expiry would contradict the domain model, and reusing addBatch keeps derivation identical
   (DRY). — reversible.
+  - **D13.1 refinement (impl, 2026-06-25):** the importer calls `addBatch(product,value,date,[code])`
+    **one row at a time** (one-element batch) rather than grouping. `addBatch` uses `INSERT IGNORE` and
+    returns 0 for an existing code, so per-row calls give **exact per-row duplicate attribution** for the
+    admin's skipped report; grouping only saved prepared statements, negligible for an occasional admin
+    import. Within-file duplicates are caught (a `seen` set) before the store is touched. Still reuses
+    `addBatch`, so `Expiry::expiresOn` derivation is unchanged. — reversible.
 - **D14 [WS2] — Per-table CSV export scope** → `porto_codes.csv` (all columns) and
   `porto_requests.csv` (all columns **including** raw name/email and the hashes), admin-gated.
   Every cell is run through spreadsheet-formula-injection prefixing (`'` before `= + - @` / tab / CR).

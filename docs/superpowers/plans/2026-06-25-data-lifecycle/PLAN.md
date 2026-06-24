@@ -152,17 +152,24 @@ ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Portability\Csv
   `(product,value_cents,purchase_date)`** and each group sent to `addBatch`. DB-duplicate skips =
   `rows_sent − addBatch_return`; invalid-row skips carry a reason.
 
-- [ ] Step 1: Unit test (fake CodeRepository capturing `addBatch` calls) — valid rows grouped + counted;
-  unknown product → skipped(reason); unparseable date → skipped; missing code → skipped; value_cents
-  defaults to catalog when absent; DB-dup (fake returns < sent) reflected in `skipped`.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement `CodesCsvImporter`.
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test (mocked `CodeStore` recording `addBatch` calls + `ProductCatalog::default()`) —
+  valid rows pass through; unknown product/invalid date/invalid value_cents/empty code → skipped(reason,row);
+  value_cents defaults to catalog; DB-dup (fake returns 0) → skipped; within-file dup → skipped, store hit once.
+- [x] Step 2: Ran `--filter CodesCsvImporter` → RED (8 errors, class missing).
+- [x] Step 3: Implemented `src/Portability/CodesCsvImporter.php`. **D13 refinement:** calls
+  `addBatch(product,value,date,[code])` **per row** (one-element batch) instead of grouping — exact per-row
+  duplicate attribution for the admin report; INSERT IGNORE return 0 = "already in DB". Within-file dedup
+  before the store. Reuses `addBatch` (so `Expiry` still derives `expires_on`).
+- [x] Step 4: Unit → PASS (8 tests, 30 assertions). Committed.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter CodesCsvImporter`
-**DoD:** valid rows insert via `addBatch` (grouped); invalid/dup rows reported with reasons; expiry derived.
+**DoD:** valid rows insert via `addBatch` (per-row); invalid/dup rows reported with reasons; expiry derived. ✅
 **Evidence:**
 ```
+# RED -> ERRORS! Tests: 8, Errors: 8 (class missing)
+# GREEN -> OK (8 tests, 30 assertions)
+# Proven: per-row reason+row for unknown product / 2026/01/15 date / non-numeric value / empty code /
+#         within-file dup (store hit once) / DB dup (fake returns 0 -> 'already exists in database').
 ```
 
 ### Task 5: `BundleSerializer` — lossless export bundle (incl. salt)
@@ -177,16 +184,19 @@ ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Portability\Csv
   `parse(string $json): array` → the same associative structure; throws `\RuntimeException` on an
   unknown `format_version` or malformed JSON.
 
-- [ ] Step 1: Unit test — `parse(build(...))` round-trips settings (incl. `hash_salt`), codes, requests
-  losslessly; unknown `format_version` throws; non-JSON throws.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement (`json_encode`/`json_decode` with `JSON_THROW_ON_ERROR`).
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test — `parse(build(...))` round-trips settings (incl. `hash_salt`), codes, requests
+  losslessly (assertSame, type-exact); unknown `format_version` throws; non-JSON throws; missing keys throw.
+- [x] Step 2: Ran `--filter BundleSerializer` → RED (4 failed, class missing).
+- [x] Step 3: Implemented `src/Portability/BundleSerializer.php` (`JSON_THROW_ON_ERROR`; FORMAT_VERSION=1;
+  required-keys + version guard on parse).
+- [x] Step 4: Unit → PASS (4 tests, 11 assertions). Committed.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter BundleSerializer`
-**DoD:** lossless round-trip incl. salt; version-guarded parse.
+**DoD:** lossless round-trip incl. salt; version-guarded parse. ✅
 **Evidence:**
 ```
+# RED -> ERRORS/FAILURES 4 (class missing)
+# GREEN -> OK (4 tests, 11 assertions)  [salt 'SECRETSALT' survives round-trip; format_version 999 + bad JSON + missing keys all throw]
 ```
 
 ### Task 6: `BundleCrypto` — optional sodium passphrase encryption
@@ -199,16 +209,21 @@ ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Portability\Csv
   key via `sodium_crypto_pwhash`); `decrypt(string $blob, string $passphrase): string` (throws on bad
   passphrase / tampered blob). When `available()` is false, the Tools UI hides the option.
 
-- [ ] Step 1: Unit test (skip with message if `!available()`) — `decrypt(encrypt(p,'pw'),'pw') === p`;
-  wrong passphrase throws; a non-bundle blob throws.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement using `sodium_crypto_pwhash` + `sodium_crypto_secretbox`.
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test (skips if `!available()`) — round-trip; wrong passphrase throws; non-bundle blob
+  throws; two encryptions of same text differ (random salt+nonce) yet both decrypt.
+- [x] Step 2: Ran `--filter BundleCrypto` → RED (4 errors, class missing).
+- [x] Step 3: Implemented `src/Portability/BundleCrypto.php` (MAGIC|pwhash-salt|nonce|secretbox;
+  `sodium_crypto_pwhash` key derivation; `sodium_memzero`; `available()` feature-detect).
+- [x] Step 4: Unit → PASS (4 tests, 7 assertions) — ext-sodium present on runtime, real coverage.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter BundleCrypto`
-**DoD:** authenticated round-trip; wrong passphrase rejected; graceful when sodium absent.
+**DoD:** authenticated round-trip; wrong passphrase rejected; graceful when sodium absent. ✅
 **Evidence:**
 ```
+# php -r function_exists checks -> sodium available (true,true,true)
+# RED -> ERRORS! Tests: 4, Errors: 4
+# GREEN -> OK (4 tests, 7 assertions)   [wrong passphrase + tampered/short blob throw via Poly1305 MAC]
+# Full unit suite after Tasks 4-6: composer test:unit -> OK (81 tests, 217 assertions)
 ```
 
 ### Task 7: `ExportService` — collect + stream (CSV per-table + bundle)
