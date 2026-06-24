@@ -57,4 +57,44 @@ final class CodeRepository
         $table = $this->table();
         return $this->wpdb->get_row($this->wpdb->prepare("SELECT * FROM $table WHERE id=%d", $id)) ?: null;
     }
+
+    public function claimOne(string $product, \DateTimeImmutable $now, int $reservationTtlMinutes): ?int
+    {
+        $table = $this->table();
+        $id = $this->wpdb->get_var($this->wpdb->prepare(
+            "SELECT id FROM $table
+              WHERE product=%s AND status='available' AND expires_on >= %s
+              ORDER BY purchase_date ASC, id ASC LIMIT 1",
+            $product, $now->format('Y-m-d')
+        ));
+        if ($id === null) { return null; }
+
+        $reservedUntil = $now->modify("+{$reservationTtlMinutes} minutes")->format('Y-m-d H:i:s');
+        $affected = $this->wpdb->query($this->wpdb->prepare(
+            "UPDATE $table SET status='reserved', reserved_until=%s, updated_at=%s
+              WHERE id=%d AND status='available'",
+            $reservedUntil, $now->format('Y-m-d H:i:s'), (int) $id
+        ));
+        return $affected === 1 ? (int) $id : null; // 0 => lost the race; caller retries
+    }
+
+    public function markIssued(int $codeId, int $requestId, string $issuedToHash, \DateTimeImmutable $now): bool
+    {
+        $table = $this->table();
+        return 1 === $this->wpdb->query($this->wpdb->prepare(
+            "UPDATE $table SET status='issued', issued_at=%s, request_id=%d, issued_to_hash=%s, updated_at=%s
+              WHERE id=%d AND status='reserved'",
+            $now->format('Y-m-d H:i:s'), $requestId, $issuedToHash, $now->format('Y-m-d H:i:s'), $codeId
+        ));
+    }
+
+    public function releaseStaleReservations(\DateTimeImmutable $now): int
+    {
+        $table = $this->table();
+        return (int) $this->wpdb->query($this->wpdb->prepare(
+            "UPDATE $table SET status='available', reserved_until=NULL, updated_at=%s
+              WHERE status='reserved' AND reserved_until < %s",
+            $now->format('Y-m-d H:i:s'), $now->format('Y-m-d H:i:s')
+        ));
+    }
 }
