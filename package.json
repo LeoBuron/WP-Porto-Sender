@@ -2,12 +2,14 @@
   "name": "wp-porto-sender",
   "private": true,
   "scripts": {
+    "build": "wp-scripts build --webpack-src-dir=src/Frontend/block --output-path=build/block",
     "env": "wp-env",
     "env:start": "wp-env start",
     "test:integration": "wp-env run tests-cli --env-cwd=wp-content/plugins/wp-porto-sender ./vendor/bin/phpunit -c phpunit-integration.xml"
   },
   "devDependencies": {
-    "@wordpress/env": "^10"
+    "@wordpress/env": "^10",
+    "@wordpress/scripts": "^32.4.1"
   },
   "dependencies": {
     "altcha": "^3.1.0"

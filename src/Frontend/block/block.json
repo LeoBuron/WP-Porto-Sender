@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "porto-sender/request",
+  "title": "Porto-Code anfordern",
+  "category": "widgets",
+  "icon": "email-alt",
+  "editorScript": "file:./index.js"
+}

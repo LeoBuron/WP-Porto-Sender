@@ -1,0 +1,1 @@
+(()=>{"use strict";const e=window.wp.blocks,o=window.wp.blockEditor,r=window.ReactJSXRuntime;(0,e.registerBlockType)("porto-sender/request",{edit:()=>(0,r.jsx)("p",{...(0,o.useBlockProps)(),children:"Porto-Code Anforderungsformular (wird im Frontend angezeigt)."}),save:()=>null})})();
