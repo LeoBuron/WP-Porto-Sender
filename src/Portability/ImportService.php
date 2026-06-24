@@ -55,7 +55,7 @@ final class ImportService
             $this->requests->deleteAll();
             $insertedCodes = $this->codes->insertRows($codes);
             $insertedRequests = $this->requests->insertRows($requests);
-            update_option(Settings::OPTION, $data['settings']); // restores salt
+            update_option(Settings::OPTION, $this->sanitizeImportedSettings($data['settings'])); // restores salt
             (new SchemaVersion())->set((string) $data['schema_version']);
 
             return ['mode' => $mode, 'codes' => $insertedCodes, 'requests' => $insertedRequests, 'warnings' => []];
@@ -78,6 +78,28 @@ final class ImportService
         }
 
         throw new \InvalidArgumentException('Unknown import mode: ' . $mode);
+    }
+
+    /**
+     * Whitelist imported settings against the known keys before restoring them.
+     *
+     * A bundle is untrusted input; writing its settings array verbatim would let
+     * a crafted bundle inject arbitrary option keys. Keep only keys that exist in
+     * Settings::defaults() (including the intentionally-restored hash_salt) and
+     * fill any missing key from defaults. Per-field value validation is not
+     * applied: a full restore is an admin-authorized destructive action over the
+     * admin's own bundle, and all settings are escaped on output downstream.
+     *
+     * @param mixed $imported
+     * @return array<string,mixed>
+     */
+    private function sanitizeImportedSettings(mixed $imported): array
+    {
+        $defaults = Settings::defaults();
+        if (!is_array($imported)) {
+            return $defaults;
+        }
+        return array_merge($defaults, array_intersect_key($imported, $defaults));
     }
 
     private function maybeDecrypt(string $blob, ?string $passphrase): string

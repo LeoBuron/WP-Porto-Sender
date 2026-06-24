@@ -76,6 +76,28 @@ final class ImportServiceTest extends WpUnitTestCase
         ], $this->log);
     }
 
+    public function test_full_restore_drops_unknown_settings_keys_but_keeps_known(): void
+    {
+        $captured = null;
+        Functions\when('update_option')->alias(function ($key, $val) use (&$captured): bool {
+            if ($key === \PortoSender\Settings\Settings::OPTION) { $captured = $val; }
+            return true;
+        });
+        $svc = $this->service();
+
+        $svc->importBundle(
+            $this->bundleJson(['settings' => ['hash_salt' => 'SRC', 'evil_key' => 'x', 'alert_email' => 'a@b.test']]),
+            null,
+            ImportService::MODE_FULL
+        );
+
+        $this->assertIsArray($captured);
+        $this->assertArrayNotHasKey('evil_key', $captured);     // unknown key dropped
+        $this->assertSame('SRC', $captured['hash_salt']);        // restored secret preserved
+        $this->assertSame('a@b.test', $captured['alert_email']); // known key preserved
+        $this->assertArrayHasKey('owner_address', $captured);    // defaults filled in
+    }
+
     public function test_data_merge_inserts_without_clearing_or_overwriting_settings(): void
     {
         Functions\expect('update_option')->never();

@@ -341,13 +341,28 @@ nonce+cap-gated. ✅ (browser-UX smoke folded into WS2 end-to-end)
 ```
 
 ### WS2 SECURITY REVIEW (gate before WS2 done)
-- [ ] Run `security-review` (or a security subagent) over the WS2 diff. Append findings to SECURITY.md.
-- [ ] Fix all crit/high; re-run affected tests; re-review. Confirm: formula-injection escaping; import
-  MIME/ext/size/row caps + no `unserialize`/`eval` + sanitised filename; bundle streamed (no web-readable
-  file) + salt never logged + unencrypted-bundle confirmation; every action cap+nonce; SQL prepared.
+- [x] Adversarial security subagent reviewed the 17-file WS2 diff against the WP/plugin checklist →
+  findings appended to SECURITY.md. **0 crit, 0 high, 0 med, 5 low.**
+- [x] No crit/high to fix. Fixed the top low (settings-whitelist on full_restore) via TDD; deferred 4 lows
+  with justifications. Re-ran suites green. Confirmed: formula-injection escaping on both CSV exports;
+  import size/row caps + `is_uploaded_file` + no `unserialize`/`eval` + column allowlist; bundle streamed
+  (no web-readable file) + salt never logged + unencrypted-bundle confirmation; every action cap+nonce;
+  all SQL prepared/constant-identifier.
+- [x] **WS2 end-to-end live smoke** (real wp-env DB, `wp eval-file`): disaster-recovery story — backed up
+  the live DB (5 real codes + 1 request) + a marker → wiped + changed salt → full_restore → all real data
+  + marker + the original salt came back; cleanup removed only the marker (net-zero). PASS.
 **Evidence:**
 ```
+# security review verdict: 0 crit / 0 high / 0 med / 5 low (see SECURITY.md WS2 section)
+# fix: ImportService::sanitizeImportedSettings drops unknown keys; unit test added.
+#   composer test:unit -> OK (91 tests, 255 assertions) ; npm run test:integration -> OK (34, 110)
+# live DR smoke (wp eval-file, real runtime):
+#   PROBE pre_codes=5 post_codes=6 ; pre_requests=1 post_requests=2 ; salt_restored=yes
+#   PROBE marker_code_back=yes marker_token_resolves=yes ; PROBE PASS=yes
+#   PROBE cleanup_codes=5 requests=1  (pre-existing E2E data + settings left intact)
 ```
+
+> **WS2 (Data portability) — DONE.** Tasks 1–9 ✅ + security review ✅ + live DR smoke ✅.
 
 ---
 

@@ -2,6 +2,12 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 5 — WS2 DONE.** Security review (adversarial subagent over the 17-file diff):
+  0 crit/high/med, 5 low. Fixed the top low (full_restore now whitelists imported settings keys —
+  `ImportService::sanitizeImportedSettings`, +1 unit test); deferred 4 lows w/ justifications in SECURITY.md.
+  WS2 end-to-end live DR smoke passed on the real wp-env DB (backup→wipe→restore preserved 5 real codes +
+  salt; marker round-tripped; net-zero cleanup). Suites green: unit 91, integration 34.
+  **Next:** WS1 — Task 10 (Settings keys for admin notifications), then Tasks 11–13 + WS1 SEC.
 - **2026-06-25 · PHASE B iter 4 — Task 9 DONE; WS2 code-complete.** ToolsPage (Export/Import admin page:
   streamed downloads, cap+nonce, unencrypted-bundle confirm, 10 MB upload cap + is_uploaded_file) + wired
   in Plugin; CodeIntakePage CSV upload (importCsvFile + admin_post + form). Integration 30→34; full suites
@@ -30,7 +36,7 @@
   migration runner). Build order WS2 → WS1 → WS4 → WS3.
 
 ## Workstream status
-- WS2 (portability / spine): **code-complete** — Tasks 1–9 ✅; **WS2 SECURITY REVIEW + end-to-end live smoke pending** before WS2 is marked done.
+- WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
 - WS1 (admin notification): not started — Tasks 10–13 + SEC.
 - WS4 (uninstall & lifecycle): not started — Tasks 14–16 + SEC.
 - WS3 (geo, default-off): not started — Tasks 17–20 + SEC.
