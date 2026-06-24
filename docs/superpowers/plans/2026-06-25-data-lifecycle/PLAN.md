@@ -95,17 +95,20 @@ npm run test:integration      -> OK (27 tests, 79 assertions)    (was 23)
   `escapeCell(string $value): string` — prefixes a single `'` when the value begins with `=`, `+`, `-`,
   `@`, tab (`\t`), or CR (`\r`).
 
-- [ ] Step 1: Unit test — `escapeCell('=cmd')` → `"'=cmd"`; same for `+`,`-`,`@`,leading tab/CR;
-  `escapeCell('safe')` unchanged; `toString` emits header + quoted rows, embedded commas/quotes/newlines
-  quoted per RFC-4180.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement `CsvWriter`.
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test — `escapeCell` prefixes `= + - @` tab/CR; leaves safe + multibyte-lead cells;
+  `toString` RFC-4180-quotes comma/quote fields, casts non-strings, composes escape-then-quote.
+- [x] Step 2: Ran `--filter CsvWriter` → 5 errors "Class CsvWriter not found" (RED).
+- [x] Step 3: Implemented `src/Portability/CsvWriter.php`.
+- [x] Step 4: Unit → PASS (5 tests, 13 assertions). Committed.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter CsvWriter`
-**DoD:** every dangerous-leading-character cell is prefixed; RFC-4180 quoting correct.
+**DoD:** every dangerous-leading-character cell is prefixed; RFC-4180 quoting correct. ✅
 **Evidence:**
 ```
+# RED: vendor/bin/phpunit -c phpunit-unit.xml --filter CsvWriter
+ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Portability\CsvWriter" not found)
+# GREEN: same -> OK (5 tests, 13 assertions)
+# Key cases proven: "'=SUM(A1,A2)" -> "\"'=SUM(A1,A2)\"" (escape-then-quote); 'Ärmel' unchanged.
 ```
 
 ### Task 3: `CsvReader` — strict header-mapped parsing with caps
@@ -118,16 +121,20 @@ npm run test:integration      -> OK (27 tests, 79 assertions)    (was 23)
   (header→value maps, column order irrelevant); throws `\RuntimeException` on a missing required header
   or when data rows exceed `maxRows`.
 
-- [ ] Step 1: Unit test — parses header + rows into maps regardless of column order; reordered columns
-  still map correctly; missing required header throws; exceeding `maxRows` throws; blank lines skipped.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement `CsvReader` (`str_getcsv` per line; trim BOM; lowercase header keys).
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test — header→value maps; column order irrelevant; missing required header throws;
+  `maxRows` exceeded throws; blank/whitespace lines skipped; BOM stripped + header trimmed/lowercased;
+  quoted comma field preserved.
+- [x] Step 2: Ran `--filter CsvReader` → RED (class missing: 5 errors + 2 expectException mismatches).
+- [x] Step 3: Implemented `src/Portability/CsvReader.php` (fgetcsv over php://temp, escape '' = RFC-4180).
+- [x] Step 4: Unit → PASS (7 tests, 8 assertions). Committed.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter CsvReader`
-**DoD:** order-independent mapping; required-header + row-cap enforcement.
+**DoD:** order-independent mapping; required-header + row-cap enforcement. ✅
 **Evidence:**
 ```
+# RED: vendor/bin/phpunit -c phpunit-unit.xml --filter CsvReader  -> ERRORS/FAILURES 7 (class missing)
+# GREEN: same -> OK (7 tests, 8 assertions)
+# Full unit suite after Tasks 2+3: composer test:unit -> OK (65 tests, 169 assertions)
 ```
 
 ### Task 4: `CodesCsvImporter` — CSV rows → `addBatch`
