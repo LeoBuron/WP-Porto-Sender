@@ -91,8 +91,8 @@ final class Plugin
             $defaults['alert_email'] = get_option('admin_email', '');
         }
         update_option(Settings::OPTION, array_merge($defaults, is_array($existing) ? $existing : [], [
-            'hash_salt' => $existing['hash_salt'] ?? $defaults['hash_salt'],
-            'alert_email' => $existing['alert_email'] ?? $defaults['alert_email'],
+            'hash_salt' => ($existing['hash_salt'] ?? '') ?: $defaults['hash_salt'],
+            'alert_email' => ($existing['alert_email'] ?? '') ?: $defaults['alert_email'],
         ]));
 
         if (!wp_next_scheduled(Maintenance::HOOK)) {
