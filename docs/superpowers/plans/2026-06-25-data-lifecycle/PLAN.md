@@ -1,0 +1,611 @@
+# Data lifecycle & portability — Implementation Plan (WS1–WS4)
+
+> **For agentic workers (the loop):** this is the single source of truth for PHASE B. Each task has
+> Files, Interfaces, a TDD step checklist, an explicit **Verify** command, a **DoD**, and an
+> **Evidence** slot. Check a task `[x]` only after pasting real command+output into its Evidence slot.
+> Re-read the spec (`docs/superpowers/specs/2026-06-25-data-lifecycle-design.md`) and DECISIONS.md each
+> iteration. Implement with TDD (`superpowers:test-driven-development`).
+
+**Goal:** Ship four data-lifecycle workstreams — admin notification (WS1), export/import + schema
+versioning (WS2), complete uninstall + reset/delete (WS4), and a default-off geo gate (WS3).
+
+**Architecture:** Small, interface-bounded units under `src/Portability`, `src/Notifications`,
+`src/Lifecycle`, `src/Geo`, plus a shared `ToolsPage`. New settings keys follow the existing
+`defaults()/sanitize()/accessor` pattern. A `DataEraser` is the single definition of "all plugin data",
+shared by `uninstall.php` and the admin delete button.
+
+**Tech Stack:** PHP 8.1+, PSR-4 `PortoSender\`, WordPress APIs, PHPUnit 11 (unit `phpunit-unit.xml`,
+integration `phpunit-integration.xml`), brain/monkey, wp-env, Playwright. ext-sodium (PHP core) for
+optional bundle encryption.
+
+## Global Constraints
+
+- **DSGVO-first.** Salted hashes only; minimize PII; the export bundle's `hash_salt` is a credential.
+- **No new runtime dependency, no enabled third-party outbound flow, no shipped licensed data file, no
+  data-destroying default** without sign-off. HARD-STOP items ship **disabled-by-default behind a
+  setting** (WS3 MaxMind/API providers; unencrypted bundle behind explicit confirm). See DECISIONS.
+- **PHP 8.1+**, `declare(strict_types=1)` in every new file.
+- **Security on every admin/REST action:** `current_user_can('manage_options')` + nonce
+  (`check_admin_referer`/`wp_verify_nonce`) for admin; public REST stays public but gated by
+  captcha + geo + rate-limit. All SQL via `$wpdb->prepare`. `esc_*` on output, `sanitize_*` on input.
+- **Settings sanitize rule:** only overwrite form-rendered keys; never clobber `hash_salt` or other
+  non-form keys.
+- **Verify commands:** unit = `composer test:unit` (or `vendor/bin/phpunit -c phpunit-unit.xml --filter <T>`);
+  integration = `npm run test:integration`; live = `npx wp-env run cli wp ...` / Playwright. After
+  reinstalling the plugin into wp-env, **reactivate via WP-CLI** so `activate()` runs.
+- **Commit** one checkpoint per verified task; end messages with the Co-Authored-By line. Never push/PR/merge without sign-off.
+
+---
+
+# WS2 — Data portability (the spine)  [build first]
+
+### Task 1: Schema versioning + migration runner
+
+**Files:**
+- Create: `src/Persistence/SchemaVersion.php`
+- Modify: `src/Persistence/Schema.php` (add `const CURRENT_VERSION = '1';`)
+- Modify: `src/Plugin.php` (call the runner in `activate()` after `Schema::install`)
+- Test: `tests/unit/Persistence/SchemaVersionTest.php`, `tests/integration/SchemaVersionTest.php`
+
+**Interfaces:**
+- Produces: `SchemaVersion::OPTION = 'porto_sender_schema_version'`;
+  `current(): string` (reads option, '' if unset); `set(string $v): void`;
+  `migrate(string $from, string $to, array $migrations): array` (returns the ordered version keys
+  applied; pure — `$migrations` is `['2' => callable, ...]`, callables run in version order for
+  versions in `(from, to]`). `run(\wpdb $wpdb): void` (reads option, applies built-in migration map up to
+  `Schema::CURRENT_VERSION`, writes it). Built-in map is empty at v1 (baseline).
+- Consumes: `Schema::CURRENT_VERSION`.
+
+- [ ] Step 1: Unit test — `migrate('','1',[])` returns `[]` and is a no-op; `migrate('1','3',['2'=>f2,'3'=>f3])`
+  runs f2 then f3 in order and returns `['2','3']`; `migrate('2','3',['2'=>f2,'3'=>f3])` runs only f3.
+- [ ] Step 2: Run `vendor/bin/phpunit -c phpunit-unit.xml --filter SchemaVersion` → FAIL.
+- [ ] Step 3: Implement `SchemaVersion` (pure `migrate`; `current/set/run` use `get_option/update_option`).
+- [ ] Step 4: Run unit → PASS.
+- [ ] Step 5: Add `Schema::CURRENT_VERSION`; in `Plugin::activate()` call `(new SchemaVersion())->run($wpdb)`
+  after `Schema::install($wpdb)`.
+- [ ] Step 6: Integration test — fresh activate sets the option to `'1'`; re-activate is idempotent.
+- [ ] Step 7: Run `npm run test:integration` (filter SchemaVersion) → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter SchemaVersion` and the integration filter.
+**DoD:** `porto_sender_schema_version` is `'1'` after activation; migration runner applies ordered steps
+for future versions; re-activation idempotent.
+**Evidence:**
+```
+(paste command + output)
+```
+
+### Task 2: `CsvWriter` — formula-injection-safe CSV building
+
+**Files:** Create `src/Portability/CsvWriter.php`; Test `tests/unit/Portability/CsvWriterTest.php`.
+
+**Interfaces:**
+- Produces: `CsvWriter::toString(array $header, array $rows): string` (RFC-4180 quoting);
+  `escapeCell(string $value): string` — prefixes a single `'` when the value begins with `=`, `+`, `-`,
+  `@`, tab (`\t`), or CR (`\r`).
+
+- [ ] Step 1: Unit test — `escapeCell('=cmd')` → `"'=cmd"`; same for `+`,`-`,`@`,leading tab/CR;
+  `escapeCell('safe')` unchanged; `toString` emits header + quoted rows, embedded commas/quotes/newlines
+  quoted per RFC-4180.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement `CsvWriter`.
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter CsvWriter`
+**DoD:** every dangerous-leading-character cell is prefixed; RFC-4180 quoting correct.
+**Evidence:**
+```
+```
+
+### Task 3: `CsvReader` — strict header-mapped parsing with caps
+
+**Files:** Create `src/Portability/CsvReader.php`; Test `tests/unit/Portability/CsvReaderTest.php`.
+
+**Interfaces:**
+- Produces: `CsvReader::__construct(int $maxRows = 5000)`;
+  `parse(string $csv, array $requiredHeaders): array` — returns `array<int,array<string,string>>`
+  (header→value maps, column order irrelevant); throws `\RuntimeException` on a missing required header
+  or when data rows exceed `maxRows`.
+
+- [ ] Step 1: Unit test — parses header + rows into maps regardless of column order; reordered columns
+  still map correctly; missing required header throws; exceeding `maxRows` throws; blank lines skipped.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement `CsvReader` (`str_getcsv` per line; trim BOM; lowercase header keys).
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter CsvReader`
+**DoD:** order-independent mapping; required-header + row-cap enforcement.
+**Evidence:**
+```
+```
+
+### Task 4: `CodesCsvImporter` — CSV rows → `addBatch`
+
+**Files:** Create `src/Portability/CodesCsvImporter.php`; Test `tests/unit/Portability/CodesCsvImporterTest.php`.
+
+**Interfaces:**
+- Consumes: `CsvReader::parse`; `CodeRepository::addBatch(string $product, int $valueCents,
+  \DateTimeImmutable $purchaseDate, array $codes): int` (derives `expires_on` via `Expiry`; `INSERT IGNORE`);
+  `ProductCatalog::get(string): ?PostageProduct`.
+- Produces: `CodesCsvImporter::import(string $csv): array` → `['inserted'=>int, 'skipped'=>array<int,array{row:int,reason:string}>]`.
+  CSV columns: **required** `product,code`; **optional** `value_cents` (default catalog value),
+  `purchase_date` (`Y-m-d`, default today). **No `expires_on` column** (derived by `Expiry`).
+  Rows are validated (product ∈ catalog; date parseable; code non-empty), then **grouped by
+  `(product,value_cents,purchase_date)`** and each group sent to `addBatch`. DB-duplicate skips =
+  `rows_sent − addBatch_return`; invalid-row skips carry a reason.
+
+- [ ] Step 1: Unit test (fake CodeRepository capturing `addBatch` calls) — valid rows grouped + counted;
+  unknown product → skipped(reason); unparseable date → skipped; missing code → skipped; value_cents
+  defaults to catalog when absent; DB-dup (fake returns < sent) reflected in `skipped`.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement `CodesCsvImporter`.
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter CodesCsvImporter`
+**DoD:** valid rows insert via `addBatch` (grouped); invalid/dup rows reported with reasons; expiry derived.
+**Evidence:**
+```
+```
+
+### Task 5: `BundleSerializer` — lossless export bundle (incl. salt)
+
+**Files:** Create `src/Portability/BundleSerializer.php`; Test `tests/unit/Portability/BundleSerializerTest.php`.
+
+**Interfaces:**
+- Produces: `BundleSerializer::FORMAT_VERSION = 1`;
+  `build(array $settings, array $codes, array $requests, string $schemaVersion, string $siteUrl, string $exportedAt): string`
+  (returns JSON: `{format_version, schema_version, exported_at, site_url, settings, codes, requests}`,
+  `settings` includes `hash_salt`);
+  `parse(string $json): array` → the same associative structure; throws `\RuntimeException` on an
+  unknown `format_version` or malformed JSON.
+
+- [ ] Step 1: Unit test — `parse(build(...))` round-trips settings (incl. `hash_salt`), codes, requests
+  losslessly; unknown `format_version` throws; non-JSON throws.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement (`json_encode`/`json_decode` with `JSON_THROW_ON_ERROR`).
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter BundleSerializer`
+**DoD:** lossless round-trip incl. salt; version-guarded parse.
+**Evidence:**
+```
+```
+
+### Task 6: `BundleCrypto` — optional sodium passphrase encryption
+
+**Files:** Create `src/Portability/BundleCrypto.php`; Test `tests/unit/Portability/BundleCryptoTest.php`.
+
+**Interfaces:**
+- Produces: `BundleCrypto::available(): bool` (ext-sodium present);
+  `encrypt(string $plaintext, string $passphrase): string` (magic header + salt + nonce + secretbox,
+  key via `sodium_crypto_pwhash`); `decrypt(string $blob, string $passphrase): string` (throws on bad
+  passphrase / tampered blob). When `available()` is false, the Tools UI hides the option.
+
+- [ ] Step 1: Unit test (skip with message if `!available()`) — `decrypt(encrypt(p,'pw'),'pw') === p`;
+  wrong passphrase throws; a non-bundle blob throws.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement using `sodium_crypto_pwhash` + `sodium_crypto_secretbox`.
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter BundleCrypto`
+**DoD:** authenticated round-trip; wrong passphrase rejected; graceful when sodium absent.
+**Evidence:**
+```
+```
+
+### Task 7: `ExportService` — collect + stream (CSV per-table + bundle)
+
+**Files:** Create `src/Portability/ExportService.php`; Test `tests/unit/Portability/ExportServiceTest.php`,
+`tests/integration/ExportServiceTest.php`.
+
+**Interfaces:**
+- Consumes: `CsvWriter`, `BundleSerializer`, `BundleCrypto`, `Settings`, `CodeRepository`,
+  `RequestRepository` (add read-all accessors `allRows(): array` to each repo if absent).
+- Produces: `ExportService::codesCsv(): string`, `requestsCsv(): string` (both formula-escaped via
+  `CsvWriter`), `bundle(?string $passphrase): string` (encrypted iff passphrase non-empty & sodium
+  available). Streaming (headers + `echo` + `exit`) lives in `ToolsPage` (Task 9), not here, so the
+  builders stay unit-testable.
+
+- [ ] Step 1: Unit test (fake repos) — `codesCsv`/`requestsCsv` contain headers + rows and are
+  formula-escaped; `bundle(null)` is parseable JSON incl. salt; `bundle('pw')` is encrypted (not valid
+  JSON, decryptable with 'pw').
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Add repo `allRows()` accessors (prepared `SELECT *`); implement `ExportService`.
+- [ ] Step 4: Run unit → PASS.
+- [ ] Step 5: Integration — seed a code + a request, assert CSV/bundle contain them. Run → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter ExportService` + integration filter.
+**DoD:** CSV + bundle builders produce correct, escaped, lossless output; PII/salt present in bundle.
+**Evidence:**
+```
+```
+
+### Task 8: `ImportService` — validate + dispatch (CSV codes / bundle restore)
+
+**Files:** Create `src/Portability/ImportService.php`; Test `tests/unit/Portability/ImportServiceTest.php`,
+`tests/integration/ImportServiceTest.php`.
+
+**Interfaces:**
+- Consumes: `CsvReader`, `CodesCsvImporter`, `BundleSerializer`, `BundleCrypto`, `DataEraser` (Task 14),
+  `Schema`, `Settings`, repos.
+- Produces: `ImportService::importBundle(string $blob, ?string $passphrase, string $mode): array` where
+  `$mode ∈ {'full_restore','data_merge'}`. `full_restore`: decrypt(if needed) → parse → validate →
+  (purge data tables via `DataEraser` data-only helper) → `Schema::install` → bulk-insert codes+requests
+  → `update_option(Settings::OPTION, settings incl. salt)` → write schema_version. `data_merge`:
+  insert-ignore codes+requests, keep local settings/salt (return a `salt_mismatch_warning`). Validation
+  (parse/version) happens **before** any destructive step. Returns `['mode','codes','requests','warnings'=>[]]`.
+
+- [ ] Step 1: Unit test — a malformed/blob-with-wrong-version aborts with no side effects (fake repos
+  assert no writes); `full_restore` calls purge→install→insert→settings in order (spy ordering);
+  `data_merge` returns the salt-mismatch warning and does NOT overwrite settings.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement `ImportService`.
+- [ ] Step 4: Run unit → PASS.
+- [ ] Step 5: Integration — export bundle (Task 7) → mutate DB → `importBundle(full_restore)` →
+  assert codes/requests/settings (incl. salt) restored. Run → PASS. Commit.
+
+**Verify:** unit filter + integration filter.
+**DoD:** validation precedes destruction; full-restore is lossless incl. salt; merge warns about salt.
+**Evidence:**
+```
+```
+
+### Task 9: `ToolsPage` — Export/Import UI + admin-post actions; CodeIntakePage CSV upload
+
+**Files:** Create `src/Admin/ToolsPage.php`; Modify `src/Admin/CodeIntakePage.php` (add CSV upload →
+`CodesCsvImporter`); Modify `src/Plugin.php` (register ToolsPage); Test
+`tests/integration/Admin/ToolsPageExportImportTest.php`.
+
+**Interfaces:**
+- Consumes: `ExportService`, `ImportService`, `CodesCsvImporter`.
+- Produces: admin page `porto-sender-tools` (cap `manage_options`); `admin_post_porto_export`,
+  `admin_post_porto_import` handlers (nonce + cap + PRG). ToolsPage performs the **streaming**
+  (`header('Content-Disposition: attachment; filename=...')` + echo + `exit`); never writes to web root.
+  CodeIntakePage gains an `<input type=file>` CSV upload routed through `CodesCsvImporter` with a result
+  notice (`inserted`/`skipped`). (Codes-CSV import lives on CodeIntakePage; bundle export/restore + per-table
+  CSV export live on ToolsPage — single, unambiguous home each.)
+
+- [ ] Step 1: Integration test — POST `porto_export` with a valid nonce as an admin streams a bundle
+  containing seeded data; without the cap/nonce → denied (`wp_die`/403). POST `porto_import` (bundle) as
+  admin restores; CodeIntakePage CSV upload inserts `porto_codes` rows.
+- [ ] Step 2: Run → FAIL.
+- [ ] Step 3: Implement ToolsPage + CodeIntakePage CSV upload + wiring in `Plugin::wire`.
+- [ ] Step 4: Run → PASS.
+- [ ] Step 5: Live smoke — Playwright drives the Tools page export download + CodeIntakePage CSV upload;
+  capture evidence. Commit.
+
+**Verify:** integration filter + the Playwright smoke output.
+**DoD:** export streams (no web-root file); import restores; CSV upload adds codes; every action
+nonce+cap-gated.
+**Evidence:**
+```
+```
+
+### WS2 SECURITY REVIEW (gate before WS2 done)
+- [ ] Run `security-review` (or a security subagent) over the WS2 diff. Append findings to SECURITY.md.
+- [ ] Fix all crit/high; re-run affected tests; re-review. Confirm: formula-injection escaping; import
+  MIME/ext/size/row caps + no `unserialize`/`eval` + sanitised filename; bundle streamed (no web-readable
+  file) + salt never logged + unencrypted-bundle confirmation; every action cap+nonce; SQL prepared.
+**Evidence:**
+```
+```
+
+---
+
+# WS1 — Admin notification email  [build after WS2]
+
+### Task 10: Settings keys for admin notifications
+
+**Files:** Modify `src/Settings/Settings.php` (defaults + sanitize + accessors); Test
+`tests/unit/Settings/AdminNotifySettingsTest.php`.
+
+**Interfaces:**
+- Produces: defaults `admin_notify_enabled=true`, `admin_notify_include_pii=false`,
+  `admin_notify_window_minutes=15`; accessors `adminNotifyEnabled(): bool`,
+  `adminNotifyIncludePii(): bool`, `adminNotifyWindowMinutes(): int`. `sanitize()` casts the two
+  checkboxes (absent = false) and `absint`s the window; never clobbers non-form keys.
+
+- [ ] Step 1: Unit test — defaults present; accessors return defaults + overrides; `sanitize()` casts
+  checkboxes + clamps window ≥ 0; existing keys (e.g. `hash_salt`) preserved.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement.
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter AdminNotifySettings`
+**DoD:** three keys with defaults/accessors/sanitize, non-form keys preserved.
+**Evidence:**
+```
+```
+
+### Task 11: `Mailer::sendAdminNotification`
+
+**Files:** Modify `src/Mail/Mailer.php`; Test `tests/unit/Mail/AdminNotificationMailTest.php`.
+
+**Interfaces:**
+- Produces: `Mailer::sendAdminNotification(string $to, array $data): bool` where `$data` =
+  `['product_label'=>string,'count'=>int,'remaining'=>int,'name'=>?string,'email'=>?string]`.
+  German subject/body; includes name/email only when present; text mail; uses `wp_mail`; returns its bool.
+
+- [ ] Step 1: Unit test (brain/monkey `wp_mail` spy) — composes subject/body, includes count+remaining,
+  includes name/email only when provided, returns the `wp_mail` result.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement.
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter AdminNotificationMail`
+**DoD:** new sender mirrors the existing four; PII conditional; `wp_mail`-backed.
+**Evidence:**
+```
+```
+
+### Task 12: `AdminNotifier` — policy + window throttle
+
+**Files:** Create `src/Notifications/AdminNotifier.php`; Test `tests/unit/Notifications/AdminNotifierTest.php`.
+
+**Interfaces:**
+- Consumes: `Settings`, `Mailer`, `Clock`, WP option/transient (behind a tiny store seam for testability —
+  reuse a fake in tests). 
+- Produces: `AdminNotifier::onIssued(array $ctx): void` where `$ctx` =
+  `['product_label'=>string,'remaining'=>int,'name'=>?string,'email'=>?string]`. Behaviour: if
+  `!adminNotifyEnabled()` → return. Else apply a time-bucketed window guard
+  (`porto_notify_<floor(ts/window)>`): first event in a window sends a mail (count=pending+1) and arms;
+  subsequent events in the window only increment the pending count; `window=0` → send every event. PII
+  passed to Mailer only when `adminNotifyIncludePii()`.
+
+- [ ] Step 1: Unit test (fake clock + fake counter store + spy Mailer) — enabled=false → never sends;
+  single event in empty window → one send; two events in window → one send, count=2; window=0 → every
+  event sends; include_pii toggles name/email passed to Mailer.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement (reuse the `RateCounterStore` seam or a minimal option-backed counter).
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter AdminNotifier`
+**DoD:** throttle coalesces a burst into one mail per window; toggle + PII honoured.
+**Evidence:**
+```
+```
+
+### Task 13: Wire `AdminNotifier` into issuance + SettingsPage fieldset
+
+**Files:** Modify `src/Issuance/IssuanceService.php` (inject `AdminNotifier`, call `onIssued` after
+`markIssued`), `src/Plugin.php` (construct + inject), `src/Admin/SettingsPage.php` (Admin-notifications
+fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
+
+**Interfaces:**
+- Consumes: `AdminNotifier::onIssued`. The `$ctx` is built in `confirm()` from `$product` label +
+  `availableCount(product, now)` (remaining) + (if opted in) `$req->name/$req->email`.
+
+- [ ] Step 1: Integration test — a full confirm→issue triggers exactly one admin mail (wp_mail capture);
+  with `admin_notify_enabled=false` → none; fieldset renders + saves the three keys.
+- [ ] Step 2: Run → FAIL.
+- [ ] Step 3: Implement injection + call + fieldset.
+- [ ] Step 4: Run → PASS.
+- [ ] Step 5: Live smoke — drive a real issue via WP-CLI/REST in wp-env, capture the admin mail. Commit.
+
+**Verify:** integration filter + live-smoke output.
+**DoD:** issuing a code notifies the admin once (throttled), gated by the toggle.
+**Evidence:**
+```
+```
+
+### WS1 SECURITY REVIEW (gate before WS1 done)
+- [ ] Security-review the WS1 diff → SECURITY.md. Confirm: mail only to configured `alert_email`; PII off
+  by default; no secrets/HTML injection in the mail; no new outbound flow.
+**Evidence:**
+```
+```
+
+---
+
+# WS4 — Uninstall & data lifecycle  [build after WS1; depends on WS2]
+
+### Task 14: `DataEraser::purgeAll` — single purge definition
+
+**Files:** Create `src/Lifecycle/DataEraser.php`; Test `tests/integration/Lifecycle/DataEraserTest.php`
+(unit-cover the LIKE-pattern builder in `tests/unit/Lifecycle/DataEraserPatternsTest.php`).
+
+**Interfaces:**
+- Produces: `DataEraser::purgeAll(\wpdb $wpdb): void` — (1) `Schema::uninstall`; (2) `delete_option`
+  `Settings::OPTION` + `SchemaVersion::OPTION`; (3) prepared `DELETE FROM {options} WHERE option_name LIKE`
+  for `porto_sender_lowstock_%`, `_transient_porto_rl_%`, `_transient_timeout_porto_rl_%`,
+  `_transient_porto_notify_%`, `_transient_timeout_porto_notify_%`; (4) `wp_clear_scheduled_hook('porto_sender_daily')`;
+  (5) delete any persisted export dir (defensive). Also `purgeDataTablesOnly(\wpdb): void` (step 1 only) for
+  ImportService full-restore. LIKE patterns are compile-time constants (no input interpolation).
+
+- [ ] Step 1: Integration test — seed both tables, the settings + schema-version options, a
+  `porto_sender_lowstock_x` option, a `porto_rl_*` and a `porto_notify_*` transient, and the cron event;
+  call `purgeAll`; assert all gone (tables, options by-name + by-prefix, transients, cron unscheduled).
+- [ ] Step 2: Run → FAIL.
+- [ ] Step 3: Implement.
+- [ ] Step 4: Run → PASS. Commit.
+
+**Verify:** `npm run test:integration` (filter DataEraser).
+**DoD:** one call removes every `porto_*` table/option/transient/cron; reusable by uninstall + button.
+**Evidence:**
+```
+```
+
+### Task 15: `uninstall.php` → `DataEraser`
+
+**Files:** Modify `uninstall.php`; Test `tests/integration/UninstallCompletenessTest.php`.
+
+**Interfaces:** Consumes `DataEraser::purgeAll`.
+
+- [ ] Step 1: Integration test — simulate uninstall (define `WP_UNINSTALL_PLUGIN`, seed data, invoke
+  `DataEraser::purgeAll($wpdb)` as `uninstall.php` does) → no `porto_*` option/transient/table remains,
+  cron unscheduled.
+- [ ] Step 2: Run → FAIL (today's uninstall leaks transients/cron).
+- [ ] Step 3: Replace the body of `uninstall.php` with the guard + autoload + `DataEraser::purgeAll($wpdb)`.
+- [ ] Step 4: Run → PASS. Commit.
+
+**Verify:** integration filter.
+**DoD:** uninstall leaves zero plugin residue, including transients + cron.
+**Evidence:**
+```
+```
+
+### Task 16: ToolsPage data-lifecycle (reset / delete-all) + pre-removal link
+
+**Files:** Modify `src/Admin/ToolsPage.php` (lifecycle section + `admin_post_porto_reset`,
+`admin_post_porto_wipe`), `src/Plugin.php` (`plugin_action_links` "Export/Entfernen" link); Test
+`tests/integration/Admin/DataLifecycleActionsTest.php`.
+
+**Interfaces:**
+- Consumes: `DataEraser::purgeAll`, `Schema::install`, `Settings`.
+- Produces: **Reset settings** = `delete_option(Settings::OPTION)` then re-seed `Settings::defaults()`
+  **preserving the existing `hash_salt`**. **Delete all data** = `DataEraser::purgeAll` → `Schema::install`
+  → re-seed defaults with a **new** salt. Both: cap + `check_admin_referer` + a required confirm checkbox +
+  PRG redirect + result notice. `plugin_action_links` adds a link to the Tools page.
+
+- [ ] Step 1: Integration test — reset preserves `hash_salt` (assert equal before/after) + restores other
+  defaults; delete-all yields empty tables + a *different* salt; both reject a missing/invalid nonce or a
+  non-admin or an unchecked confirm.
+- [ ] Step 2: Run → FAIL.
+- [ ] Step 3: Implement.
+- [ ] Step 4: Run → PASS.
+- [ ] Step 5: Live smoke — Playwright: export bundle → delete-all → import bundle restores (the
+  export⇄wipe⇄re-import story). Capture evidence. Commit.
+
+**Verify:** integration filter + Playwright smoke.
+**DoD:** reset keeps salt; delete-all wipes + re-inits with new salt; both fully gated; round-trip works.
+**Evidence:**
+```
+```
+
+### WS4 SECURITY REVIEW (gate before WS4 done)
+- [ ] Security-review the WS4 diff → SECURITY.md. Confirm: every destructive action cap+nonce+confirm+PRG,
+  no CSRF/GET path; `DataEraser` SQL uses constant LIKE patterns (no interpolation); reset preserves salt;
+  no secrets logged.
+**Evidence:**
+```
+```
+
+---
+
+# WS3 — Geo-restriction (Germany only)  [build last — HARD-STOP territory]
+
+### Task 17: Settings keys for geo
+
+**Files:** Modify `src/Settings/Settings.php`; Test `tests/unit/Settings/GeoSettingsTest.php`.
+
+**Interfaces:**
+- Produces: defaults `geo_enabled=false`, `geo_provider='cloudflare'`, `geo_allowed_countries=['DE']`,
+  `geo_fail_mode='open'`, `geo_cloudflare_ack=false`, `geo_maxmind_db_path=''`, `geo_api_url=''`,
+  `geo_api_key=''`; matching accessors (`geoEnabled(): bool`, `geoProvider(): string`,
+  `geoAllowedCountries(): array`, `geoFailOpen(): bool`, `geoCloudflareAck(): bool`,
+  `geoMaxmindDbPath(): string`, `geoApiUrl(): string`, `geoApiKey(): string`). `sanitize()`:
+  provider ∈ allow-list else retained; countries = uppercased 2-letter codes; fail-mode ∈ {open,closed};
+  checkboxes cast; api_key `sanitize_text_field`; never clobber non-form keys.
+
+- [ ] Step 1: Unit test — defaults + accessors + sanitize (country list parsing, provider/fail-mode
+  whitelisting, checkbox casts, non-form keys preserved).
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement.
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter GeoSettings`
+**DoD:** geo keys default OFF; accessors + sanitize correct.
+**Evidence:**
+```
+```
+
+### Task 18: `GeoProvider` interface + providers + factory
+
+**Files:** Create `src/Geo/GeoProvider.php`, `NullGeoProvider.php`, `CloudflareHeaderGeoProvider.php`,
+`MaxMindGeoProvider.php`, `ApiGeoProvider.php`, `GeoProviderFactory.php`; Tests under `tests/unit/Geo/`.
+
+**Interfaces:**
+- Produces: `interface GeoProvider { public function country(string $ip): ?string; }`.
+  `NullGeoProvider` → always null. `CloudflareHeaderGeoProvider` → uppercased `HTTP_CF_IPCOUNTRY` or null
+  (treats `XX`/`T1`/empty as null). `MaxMindGeoProvider::available(): bool` (reader class + readable db
+  path); `country()` → null when unavailable. `ApiGeoProvider` → `wp_remote_get` to `geo_api_url` with key;
+  parses a 2-letter code; null on network error/bad body. `GeoProviderFactory::make(Settings): GeoProvider`
+  → returns `NullGeoProvider` when geo disabled, the provider unavailable, or (Cloudflare) the ack is off.
+
+- [ ] Step 1: Unit tests — Cloudflare reads the header (set/absent/`XX`); Null always null; MaxMind
+  unavailable → null; Api parses a faked `wp_remote_get` body and maps a `WP_Error`/non-200 to null;
+  factory returns Null when disabled/unacked/unavailable, else the chosen provider.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement (ship **no** MaxMind lib/data; Api off without url+key).
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter Geo`
+**DoD:** provider-agnostic; sign-off providers inert without their prerequisites; factory fails safe to Null.
+**Evidence:**
+```
+```
+
+### Task 19: `GeoGate` — policy
+
+**Files:** Create `src/Geo/GeoGate.php`; Test `tests/unit/Geo/GeoGateTest.php`.
+
+**Interfaces:**
+- Consumes: `GeoProvider`, `Settings`.
+- Produces: `GeoGate::__construct(GeoProvider $p, Settings $s)`; `allows(string $ip): bool` — if
+  `!geoEnabled()` → true; else `c = p.country(ip)` (provider exceptions caught → treated as null);
+  `c === null` → `geoFailOpen()`; `c ∈ geoAllowedCountries()` → true else false. Pure; never throws.
+
+- [ ] Step 1: Unit test — disabled → allow; DE → allow; FR → deny; null+open → allow; null+closed → deny;
+  provider throws → caught → fail-mode applied; allowed `['DE','AT']` honoured.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement.
+- [ ] Step 4: Run unit → PASS. Commit.
+
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter GeoGate`
+**DoD:** pure boolean policy; fail-mode correct; cannot throw.
+**Evidence:**
+```
+```
+
+### Task 20: Wire `GeoGate` into issuance + REST 403 + UI
+
+**Files:** Modify `src/Issuance/IssuanceService.php` (inject `GeoGate`; step **after captcha, before
+rate-limit**; return `['status'=>'geo_blocked']`), `src/Plugin.php` (construct via `GeoProviderFactory`),
+`src/Rest/RestController.php` (`geo_blocked` → HTTP 403), `assets/porto-form.js` (geo message),
+`src/Admin/SettingsPage.php` (Geo fieldset incl. ack + sign-off notices); Test
+`tests/unit/Issuance/GeoGatePlacementTest.php`, `tests/integration/GeoBlockedResponseTest.php`.
+
+**Interfaces:** Consumes `GeoGate::allows($rawIp)`. The gate gets the **raw** IP (`$input['ip']`); nothing
+new persisted.
+
+- [ ] Step 1: Unit test — a denying `GeoGate` → `submit()` returns `geo_blocked` and rate-limit/dedup/
+  create are never reached (spies); an allowing gate is transparent.
+- [ ] Step 2: Run unit → FAIL.
+- [ ] Step 3: Implement injection + ordering + REST 403 + JS message + fieldset.
+- [ ] Step 4: Run unit → PASS.
+- [ ] Step 5: Integration — REST `geo_blocked` → HTTP 403 (force a denying provider/config). Run → PASS.
+- [ ] Step 6: Live smoke — with geo disabled (default), a normal submit still works end-to-end (proves the
+  gate is transparent when off). Capture. Commit.
+
+**Verify:** unit + integration filters + smoke.
+**DoD:** geo gate sits after captcha/before rate-limit, returns 403 when blocking, transparent when off,
+never disables other gates.
+**Evidence:**
+```
+```
+
+### WS3 SECURITY REVIEW (gate before WS3 done)
+- [ ] Security-review the WS3 diff → SECURITY.md. Confirm: Cloudflare proxy-header trust documented +
+  ack-gated + default off; gate fail-mode cannot disable other gates; API provider off by default +
+  sign-off + key masked/never logged; no licensed data/lib shipped.
+**Evidence:**
+```
+```
+
+---
+
+# FINAL — STOP CONDITION
+
+- [ ] **Whole unit suite green:** `composer test:unit` → paste summary.
+- [ ] **Whole integration suite green (wp-env):** `npm run test:integration` → paste summary.
+- [ ] **One live end-to-end smoke per workstream** (wp-env + WP-CLI/Playwright), evidence captured:
+  WS2 export⇄wipe⇄re-import round-trip; WS1 issue→admin mail; WS4 delete-all + uninstall residue check;
+  WS3 default-off submit works (+ a forced geo_blocked 403).
+- [ ] **Final whole-branch security review** (`security-review`) with **zero open Critical/High** in
+  SECURITY.md (med/low may be deferred with one-line justification).
+- [ ] **Cleanup:** no seeded test data or `porto_rl_*`/`porto_notify_*` transients left; tree clean except
+  intended changes.
+- [ ] Write `SUMMARY.md` (what shipped, evidence pointers, open sign-off items) and **stop the loop**
+  (do not schedule another iteration).
+**Evidence:**
+```
+```
