@@ -10,6 +10,8 @@ use PortoSender\Limiting\RequestLimiter;
 use PortoSender\Limiting\RateLimiter;
 use PortoSender\Limiting\TransientRateCounterStore;
 use PortoSender\Mail\Mailer;
+use PortoSender\Mail\MailerInterface;
+use PortoSender\Postage\PostageProduct;
 use PortoSender\Notifications\AdminNotifier;
 use PortoSender\Notifications\WpNotifyThrottleStore;
 use PortoSender\Support\{Hasher, TokenGenerator, SystemClock};
@@ -78,5 +80,43 @@ final class AdminNotificationFlowTest extends PortoTestCase
 
         $adminMails = array_filter($this->mails, fn($m) => ($m['to'] ?? '') === 'admin@example.de');
         $this->assertCount(0, $adminMails);
+    }
+
+    public function test_notifier_failure_does_not_break_issuance(): void
+    {
+        $this->captureMail(); // delivery mail succeeds
+        global $wpdb;
+        $codes = new CodeRepository($wpdb);
+        $requests = new RequestRepository($wpdb);
+        $settings = new Settings(['enabled_products' => ['grossbrief'], 'alert_email' => 'admin@example.de', 'admin_notify_window_minutes' => 0]);
+        $hasher = new Hasher('salt');
+
+        $throwingMailer = new class implements MailerInterface {
+            public function sendConfirmation(string $email, string $name, string $confirmUrl): bool { return true; }
+            public function sendDelivery(string $email, string $name, string $code, PostageProduct $product): bool { return true; }
+            public function sendLowStock(string $to, string $productLabel, int $remaining): bool { return true; }
+            public function sendOutOfStock(string $to, string $productLabel): bool { return true; }
+            public function sendAdminNotification(string $to, array $data): bool { throw new \RuntimeException('smtp boom'); }
+        };
+        $notifier = new AdminNotifier($settings, $throwingMailer, new WpNotifyThrottleStore());
+
+        $svc = new IssuanceService(
+            new NullVerifier(), new RequestLimiter($requests),
+            new RateLimiter(new TransientRateCounterStore(), $settings, new SystemClock()),
+            $codes, $requests, new Mailer($settings), $hasher, new TokenGenerator(),
+            new UrlConfirmLinkBuilder(), $settings, ProductCatalog::default(), new SystemClock(), $notifier
+        );
+        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['BOOMCODE']);
+        $requests->createPending([
+            'name' => 'Vera', 'email' => 'v@example.de',
+            'email_hash' => $hasher->email('v@example.de'), 'name_hash' => $hasher->name('Vera'),
+            'product' => 'grossbrief', 'token_hash' => $hasher->token('BTOK'),
+            'ip_hash' => null, 'created_at' => (new SystemClock())->now()->format('Y-m-d H:i:s'),
+        ]);
+
+        // A throwing notifier must NOT break the already-completed issuance.
+        $status = $svc->confirm('BTOK')['status'];
+        $this->assertSame('issued', $status);
+        $this->assertSame(0, $codes->availableCount('grossbrief', new \DateTimeImmutable('now')));
     }
 }

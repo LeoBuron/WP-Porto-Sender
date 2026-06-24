@@ -61,7 +61,26 @@ wipe (cap+nonce on all handlers; validation precedes destruction), open redirect
   nit on the explicitly warned best-effort merge path (D15), not a security issue (id is parameterized; no
   injection); full_restore (primary path) inserts into emptied tables so ids are clean —
   **status(deferred)**: merge is a warned secondary path; dropping `id` for merge is a future enhancement.
-### WS1 — (pending)
+### WS1 — reviewed 2026-06-25 (adversarial subagent over the WS1 diff)
+
+**Result: 0 crit, 0 high, 1 med, 1 low.** No crit/high → WS1 not blocked. Categories with NO issues:
+recipient safety (mail only to `sanitize_email`'d `alert_email`, never visitor-controlled; no new third-party
+outbound), header/content injection (plain-text body, no `$headers` arg, visitor `name`/`email` only in body —
+no CRLF header injection, no HTML/XSS surface), PII/DSGVO (name/email nulled at the producer when
+`admin_notify_include_pii` off, default off), fieldset output escaping (`esc_attr`/`checked`/`esc_html`;
+sanitize casts + `absint`), throttle key integrity (constant option/transient names, no user input).
+
+- [med] src/Issuance/IssuanceService.php:126 — an exception thrown in `onIssued` (e.g. an SMTP plugin that
+  throws instead of returning false) propagated uncaught out of `confirm()`→`process()`→`maybeHandle()`
+  (a `template_redirect` callback) as a fatal to the visitor, AFTER the code was already issued — a
+  successful claim would look "failed" (support ticket / wasted retry) though the data state is consistent —
+  wrap the `onIssued` call in `try/catch (\Throwable)` that logs and swallows so a non-critical notification
+  failure never affects the completed issuance — **status(fixed)**: added try/catch + `error_log`; integration
+  test `test_notifier_failure_does_not_break_issuance` (throwing mailer → still `issued`). Suites green.
+- [low] uninstall.php — `porto_notify_pending` (option) + `porto_notify_cooldown` (transient) are not yet
+  purged on uninstall — orphaned residue after removal (tiny, bounded; transient self-expires) — add to the
+  WS4 DataEraser/uninstall — **status(deferred)**: already tracked in DECISIONS D24.1; WS4 Task 14 will purge
+  both (verified there).
 ### WS4 — (pending)
 ### WS3 — (pending)
 ### FINAL whole-branch — (pending)

@@ -2,6 +2,11 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 7 — WS1 DONE.** Task 13 wired AdminNotifier into `IssuanceService::confirm`
+  (nullable observer) + SettingsPage fieldset + integration test (real-WP `pre_wp_mail` capture). WS1 security
+  review: 0 crit/high, 1 med (uncaught `onIssued` exception reaching the visitor → **fixed** with try/catch +
+  test), 1 low (notify-state uninstall cleanup → deferred to WS4 Task 14, D24.1). Suites: unit 104, integration 37.
+  **Next:** WS4 — Task 14 (`DataEraser::purgeAll`, incl. the WS1 notify keys), then Tasks 15–16 + WS4 SEC.
 - **2026-06-25 · PHASE B iter 6 — WS1 Tasks 10–12 DONE.** (10) Settings `admin_notify_*` keys; (11)
   `Mailer::sendAdminNotification` (PII-free by default, German); (12) `AdminNotifier` rolling-cooldown
   throttle behind `NotifyThrottleStore` seam (+ `WpNotifyThrottleStore`). Unit 91→104, all green.
@@ -43,7 +48,7 @@
 
 ## Workstream status
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
-- WS1 (admin notification): **in progress** — Tasks 10–12 ✅; Task 13 (wiring) + SEC pending.
+- WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
 - WS4 (uninstall & lifecycle): not started — Tasks 14–16 + SEC.
 - WS3 (geo, default-off): not started — Tasks 17–20 + SEC.
 - FINAL stop-condition: pending.

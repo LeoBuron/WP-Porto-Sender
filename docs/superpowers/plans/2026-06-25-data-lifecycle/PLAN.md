@@ -469,11 +469,20 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
 ```
 
 ### WS1 SECURITY REVIEW (gate before WS1 done)
-- [ ] Security-review the WS1 diff → SECURITY.md. Confirm: mail only to configured `alert_email`; PII off
-  by default; no secrets/HTML injection in the mail; no new outbound flow.
+- [x] Adversarial subagent reviewed the WS1 diff → SECURITY.md. **0 crit/high, 1 med, 1 low.** Confirmed:
+  mail only to configured `alert_email`; PII off by default (nulled at producer); plain-text body, no header
+  injection; fieldset output escaped; no new outbound flow.
+- [x] Fixed the med (uncaught `onIssued` exception reaching the visitor) via TDD: try/catch + `error_log` so
+  a notifier failure never breaks the already-completed issuance. Deferred the low (notify-state uninstall
+  cleanup) to WS4 Task 14 (tracked in D24.1).
 **Evidence:**
 ```
+# verdict: 0 crit / 0 high / 1 med (fixed) / 1 low (deferred to WS4)
+# RED test_notifier_failure_does_not_break_issuance -> ERROR (RuntimeException out of confirm())
+# GREEN after try/catch -> OK; full suites: unit 104, integration 37
 ```
+
+> **WS1 (Admin notification email) — DONE.** Tasks 10–13 ✅ + security review ✅ (1 med fixed, 1 low deferred to WS4).
 
 ---
 

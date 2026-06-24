@@ -123,12 +123,19 @@ final class IssuanceService
         $this->requests->markIssued((int) $req->id, $codeId, $now);
 
         // Notify the admin that a porto code was claimed (throttled; PII-free unless opted in).
-        $this->notifier?->onIssued([
-            'product_label' => $product?->label ?? (string) $req->product,
-            'remaining' => $this->codes->availableCount((string) $req->product, $now),
-            'name' => isset($req->name) ? (string) $req->name : null,
-            'email' => isset($req->email) ? (string) $req->email : null,
-        ]);
+        // This is a non-critical side effect of an ALREADY-completed issuance: the code is
+        // issued at this point, so a notifier failure must never surface to the visitor or
+        // undo the claim. Swallow + log any error (e.g. an SMTP plugin that throws).
+        try {
+            $this->notifier?->onIssued([
+                'product_label' => $product?->label ?? (string) $req->product,
+                'remaining' => $this->codes->availableCount((string) $req->product, $now),
+                'name' => isset($req->name) ? (string) $req->name : null,
+                'email' => isset($req->email) ? (string) $req->email : null,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[wp-porto-sender] admin notification failed: ' . $e->getMessage());
+        }
 
         return ['status' => 'issued'];
     }
