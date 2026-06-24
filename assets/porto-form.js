@@ -21,6 +21,7 @@ document.querySelectorAll('.porto-request-form').forEach((form) => {
       out_of_stock: 'Aktuell sind keine Codes verfügbar.',
       captcha_failed: 'Bitte löse die Sicherheitsabfrage erneut.',
       invalid: 'Bitte fülle alle Felder korrekt aus.',
+      rate_limited: 'Zu viele Anfragen. Bitte versuche es später erneut.',
     };
     msg.textContent = messages[data.status] || 'Es ist ein Fehler aufgetreten.';
   });

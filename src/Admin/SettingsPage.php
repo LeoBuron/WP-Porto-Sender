@@ -69,6 +69,15 @@ final class SettingsPage
             printf('<p><label>%s<br><input type="%s" name="%s[%s]" value="%s"></label></p>',
                 esc_html($label), esc_attr($type), esc_attr($opt), esc_attr($key), esc_attr((string) $value));
         }
+        // Rate limiting
+        echo '<fieldset><legend>' . esc_html__('Rate-Limiting (Missbrauchsschutz)', 'wp-porto-sender') . '</legend>';
+        printf('<p><label><input type="checkbox" name="%1$s[rate_limit_enabled]" value="1" %2$s> %3$s</label></p>',
+            esc_attr($opt), checked($s->rateLimitEnabled(), true, false), esc_html__('Rate-Limiting aktiv', 'wp-porto-sender'));
+        printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[rate_limit_per_ip_day]" value="%3$d"></label></p>',
+            esc_attr($opt), esc_html__('Max. Anfragen pro IP/Tag', 'wp-porto-sender'), $s->rateLimitPerIpDay());
+        printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[rate_limit_global_hour]" value="%3$d"></label></p>',
+            esc_attr($opt), esc_html__('Max. Anfragen gesamt/Stunde', 'wp-porto-sender'), $s->rateLimitGlobalHour());
+        echo '</fieldset>';
         submit_button();
         echo '</form></div>';
     }
