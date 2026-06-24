@@ -7,6 +7,9 @@ final class Schema
     public const CODES = 'porto_codes';
     public const REQUESTS = 'porto_requests';
 
+    /** Current DB schema version; bumped when a migration is added (see SchemaVersion). */
+    public const CURRENT_VERSION = '1';
+
     public static function codesTable(\wpdb $wpdb): string { return $wpdb->prefix . self::CODES; }
     public static function requestsTable(\wpdb $wpdb): string { return $wpdb->prefix . self::REQUESTS; }
 

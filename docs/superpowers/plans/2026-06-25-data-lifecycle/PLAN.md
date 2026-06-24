@@ -56,22 +56,34 @@ optional bundle encryption.
   `Schema::CURRENT_VERSION`, writes it). Built-in map is empty at v1 (baseline).
 - Consumes: `Schema::CURRENT_VERSION`.
 
-- [ ] Step 1: Unit test — `migrate('','1',[])` returns `[]` and is a no-op; `migrate('1','3',['2'=>f2,'3'=>f3])`
-  runs f2 then f3 in order and returns `['2','3']`; `migrate('2','3',['2'=>f2,'3'=>f3])` runs only f3.
-- [ ] Step 2: Run `vendor/bin/phpunit -c phpunit-unit.xml --filter SchemaVersion` → FAIL.
-- [ ] Step 3: Implement `SchemaVersion` (pure `migrate`; `current/set/run` use `get_option/update_option`).
-- [ ] Step 4: Run unit → PASS.
-- [ ] Step 5: Add `Schema::CURRENT_VERSION`; in `Plugin::activate()` call `(new SchemaVersion())->run($wpdb)`
-  after `Schema::install($wpdb)`.
-- [ ] Step 6: Integration test — fresh activate sets the option to `'1'`; re-activate is idempotent.
-- [ ] Step 7: Run `npm run test:integration` (filter SchemaVersion) → PASS. Commit.
+- [x] Step 1: Unit test — `migrate('','1',[])` no-op; `migrate('1','3',...)` runs f2,f3 in order; skips
+  at/below `from` and above `to`; orders numerically (version_compare), not lexically (`10` after `3`).
+- [x] Step 2: Ran `--filter SchemaVersion` → 5 errors "Class SchemaVersion not found" (RED).
+- [x] Step 3: Implemented `src/Persistence/SchemaVersion.php` (pure `migrate`; `current/set/run`; empty
+  built-in migration map at v1; closures capture `$wpdb`).
+- [x] Step 4: Unit → PASS (5 tests, 9 assertions).
+- [x] Step 5: Added `Schema::CURRENT_VERSION='1'`; `Plugin::activate()` calls
+  `(new SchemaVersion())->run($wpdb)` after `Schema::install`.
+- [x] Step 6: Integration test — fresh→'1', idempotent, reconciles a stale recorded version, activate sets it.
+- [x] Step 7: Integration `--filter SchemaVersion` → PASS (4 tests). Committed.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter SchemaVersion` and the integration filter.
 **DoD:** `porto_sender_schema_version` is `'1'` after activation; migration runner applies ordered steps
-for future versions; re-activation idempotent.
+for future versions; re-activation idempotent. ✅
 **Evidence:**
 ```
-(paste command + output)
+# RED (unit): vendor/bin/phpunit -c phpunit-unit.xml --filter SchemaVersion
+ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Persistence\SchemaVersion" not found)
+
+# GREEN (unit): same command
+OK (5 tests, 9 assertions)
+
+# GREEN (integration): npm run test:integration -- --filter SchemaVersion
+OK (4 tests, 5 assertions)   [PHP 8.3.31, wp-env tests-cli]
+
+# No regressions:
+composer test:unit            -> OK (53 tests, 148 assertions)   (was 48)
+npm run test:integration      -> OK (27 tests, 79 assertions)    (was 23)
 ```
 
 ### Task 2: `CsvWriter` — formula-injection-safe CSV building

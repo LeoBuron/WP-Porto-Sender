@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace PortoSender;
 
-use PortoSender\Persistence\Schema;
+use PortoSender\Persistence\{Schema, SchemaVersion};
 use PortoSender\Settings\Settings;
 use PortoSender\Postage\ProductCatalog;
 use PortoSender\Support\{Hasher, TokenGenerator, SystemClock};
@@ -83,6 +83,7 @@ final class Plugin
     {
         global $wpdb;
         Schema::install($wpdb);
+        (new SchemaVersion())->run($wpdb);
 
         $existing = get_option(Settings::OPTION, []);
         $defaults = Settings::defaults();
