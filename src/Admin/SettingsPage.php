@@ -78,6 +78,17 @@ final class SettingsPage
         printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[rate_limit_global_hour]" value="%3$d"></label></p>',
             esc_attr($opt), esc_html__('Max. Anfragen gesamt/Stunde', 'wp-porto-sender'), $s->rateLimitGlobalHour());
         echo '</fieldset>';
+        // Admin notifications (sent to the "Alarm-E-Mail" address above).
+        echo '<fieldset><legend>' . esc_html__('Admin-Benachrichtigung bei Abruf', 'wp-porto-sender') . '</legend>';
+        printf('<p><label><input type="checkbox" name="%1$s[admin_notify_enabled]" value="1" %2$s> %3$s</label></p>',
+            esc_attr($opt), checked($s->adminNotifyEnabled(), true, false),
+            esc_html__('Benachrichtigung an die Alarm-E-Mail senden, wenn ein Porto abgerufen wird', 'wp-porto-sender'));
+        printf('<p><label><input type="checkbox" name="%1$s[admin_notify_include_pii]" value="1" %2$s> %3$s</label></p>',
+            esc_attr($opt), checked($s->adminNotifyIncludePii(), true, false),
+            esc_html__('Name und E-Mail des Anfragenden mitsenden (Datenschutz beachten)', 'wp-porto-sender'));
+        printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[admin_notify_window_minutes]" value="%3$d"></label></p>',
+            esc_attr($opt), esc_html__('Sammelfenster in Minuten (0 = jede Anfrage einzeln)', 'wp-porto-sender'), $s->adminNotifyWindowMinutes());
+        echo '</fieldset>';
         submit_button();
         echo '</form></div>';
     }

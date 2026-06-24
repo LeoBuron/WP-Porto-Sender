@@ -13,6 +13,7 @@ use PortoSender\Support\TokenGenerator;
 use PortoSender\Support\Clock;
 use PortoSender\Settings\Settings;
 use PortoSender\Postage\ProductCatalog;
+use PortoSender\Notifications\AdminNotifier;
 
 final class IssuanceService
 {
@@ -29,6 +30,7 @@ final class IssuanceService
         private Settings $settings,
         private ProductCatalog $catalog,
         private Clock $clock,
+        private ?AdminNotifier $notifier = null,
     ) {}
 
     /** @return array{status:string} */
@@ -119,6 +121,14 @@ final class IssuanceService
 
         $this->codes->markIssued($codeId, (int) $req->id, (string) $req->email_hash, $now);
         $this->requests->markIssued((int) $req->id, $codeId, $now);
+
+        // Notify the admin that a porto code was claimed (throttled; PII-free unless opted in).
+        $this->notifier?->onIssued([
+            'product_label' => $product?->label ?? (string) $req->product,
+            'remaining' => $this->codes->availableCount((string) $req->product, $now),
+            'name' => isset($req->name) ? (string) $req->name : null,
+            'email' => isset($req->email) ? (string) $req->email : null,
+        ]);
 
         return ['status' => 'issued'];
     }

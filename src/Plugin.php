@@ -12,6 +12,7 @@ use PortoSender\Requests\RequestRepository;
 use PortoSender\Limiting\{RequestLimiter, RateLimiter, TransientRateCounterStore};
 use PortoSender\Captcha\{AltchaVerifier, NullVerifier, CaptchaVerifier};
 use PortoSender\Mail\Mailer;
+use PortoSender\Notifications\{AdminNotifier, WpNotifyThrottleStore};
 use PortoSender\Issuance\{IssuanceService, UrlConfirmLinkBuilder};
 use PortoSender\Rest\RestController;
 use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar};
@@ -43,12 +44,14 @@ final class Plugin
     {
         $codes = new CodeRepository($wpdb);
         $requests = new RequestRepository($wpdb);
+        $mailer = new Mailer($s);
         return new IssuanceService(
             self::captcha($s), new RequestLimiter($requests),
             new RateLimiter(new TransientRateCounterStore(), $s, new SystemClock()),
-            $codes, $requests, new Mailer($s),
+            $codes, $requests, $mailer,
             new Hasher($s->hashSalt()), new TokenGenerator(), new UrlConfirmLinkBuilder(),
-            $s, ProductCatalog::default(), new SystemClock()
+            $s, ProductCatalog::default(), new SystemClock(),
+            new AdminNotifier($s, $mailer, new WpNotifyThrottleStore())
         );
     }
 

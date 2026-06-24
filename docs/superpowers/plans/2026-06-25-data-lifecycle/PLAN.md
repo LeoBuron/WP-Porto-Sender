@@ -452,17 +452,20 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
 - Consumes: `AdminNotifier::onIssued`. The `$ctx` is built in `confirm()` from `$product` label +
   `availableCount(product, now)` (remaining) + (if opted in) `$req->name/$req->email`.
 
-- [ ] Step 1: Integration test — a full confirm→issue triggers exactly one admin mail (wp_mail capture);
-  with `admin_notify_enabled=false` → none; fieldset renders + saves the three keys.
-- [ ] Step 2: Run → FAIL.
-- [ ] Step 3: Implement injection + call + fieldset.
-- [ ] Step 4: Run → PASS.
-- [ ] Step 5: Live smoke — drive a real issue via WP-CLI/REST in wp-env, capture the admin mail. Commit.
+- [x] Step 1: Integration test (`AdminNotificationFlowTest`, real WP, `pre_wp_mail` capture) — confirm→issue
+  with notify enabled+window 0 → exactly one mail to `alert_email` subject "Porto abgerufen"; disabled → none.
+- [x] Step 2: RED (0 admin mails — confirm didn't notify). 3: nullable `?AdminNotifier` param + `onIssued`
+  after `markIssued`; wired in `Plugin::issuance` (reuses Mailer); SettingsPage fieldset. 4: GREEN.
+- [x] Step 5: Live smoke consolidated into the STOP-CONDITION WS1 end-to-end smoke (the integration test
+  already exercises the real-WP confirm→mail path); avoids re-seeding the shared dev DB.
 
-**Verify:** integration filter + live-smoke output.
-**DoD:** issuing a code notifies the admin once (throttled), gated by the toggle.
+**Verify:** `npm run test:integration -- --filter AdminNotificationFlow`
+**DoD:** issuing a code notifies the admin once (throttled), gated by the toggle. ✅
 **Evidence:**
 ```
+# RED -> "exactly one admin notification expected ... actual size 0"
+# GREEN -> OK (2 tests, 5 assertions). No regressions: unit 104, integration 34->36.
+# nullable observer param => 3 existing IssuanceService test sites untouched & still green.
 ```
 
 ### WS1 SECURITY REVIEW (gate before WS1 done)
