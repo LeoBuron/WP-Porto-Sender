@@ -79,4 +79,44 @@ final class SettingsTest extends WpUnitTestCase
         $this->assertSame(90, $out['pii_retention_days']);
         $this->assertSame(['grossbrief'], $out['enabled_products']);
     }
+
+    public function test_rate_limit_defaults(): void
+    {
+        $s = new Settings();
+        $this->assertTrue($s->rateLimitEnabled());
+        $this->assertSame(3, $s->rateLimitPerIpDay());
+        $this->assertSame(20, $s->rateLimitGlobalHour());
+    }
+
+    public function test_rate_limit_overrides(): void
+    {
+        $s = new Settings([
+            'rate_limit_enabled' => false,
+            'rate_limit_per_ip_day' => 1,
+            'rate_limit_global_hour' => 50,
+        ]);
+        $this->assertFalse($s->rateLimitEnabled());
+        $this->assertSame(1, $s->rateLimitPerIpDay());
+        $this->assertSame(50, $s->rateLimitGlobalHour());
+    }
+
+    public function test_sanitize_handles_rate_limit_fields(): void
+    {
+        \Brain\Monkey\Functions\when('get_option')->justReturn([]);
+
+        // Checkbox present + ints provided.
+        $on = Settings::sanitize([
+            'rate_limit_enabled' => '1',
+            'rate_limit_per_ip_day' => '5',
+            'rate_limit_global_hour' => '99',
+        ]);
+        $this->assertTrue($on['rate_limit_enabled']);
+        $this->assertSame(5, $on['rate_limit_per_ip_day']);
+        $this->assertSame(99, $on['rate_limit_global_hour']);
+
+        // Checkbox absent => disabled; absint mirrors existing threshold handling (abs value).
+        $off = Settings::sanitize(['rate_limit_per_ip_day' => '-4']);
+        $this->assertFalse($off['rate_limit_enabled']);
+        $this->assertSame(4, $off['rate_limit_per_ip_day']);
+    }
 }

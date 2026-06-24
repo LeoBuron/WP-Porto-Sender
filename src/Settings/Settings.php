@@ -30,6 +30,9 @@ final class Settings
             'default_low_stock' => 5,
             'alert_email' => '',
             'request_limit_mode' => 'name_or_email',
+            'rate_limit_enabled' => true,
+            'rate_limit_per_ip_day' => 3,
+            'rate_limit_global_hour' => 20,
             'pii_retention_days' => 180,
             'captcha_provider' => 'altcha',
             'altcha_hmac_secret' => '',
@@ -51,6 +54,9 @@ final class Settings
     }
     public function alertEmail(): string { return (string) $this->values['alert_email']; }
     public function requestLimitMode(): string { return (string) $this->values['request_limit_mode']; }
+    public function rateLimitEnabled(): bool { return (bool) $this->values['rate_limit_enabled']; }
+    public function rateLimitPerIpDay(): int { return (int) $this->values['rate_limit_per_ip_day']; }
+    public function rateLimitGlobalHour(): int { return (int) $this->values['rate_limit_global_hour']; }
     public function piiRetentionDays(): int { return (int) $this->values['pii_retention_days']; }
     public function captchaProvider(): string { return (string) $this->values['captcha_provider']; }
     public function altchaHmacSecret(): string { return (string) $this->values['altcha_hmac_secret']; }
@@ -81,6 +87,10 @@ final class Settings
         $result['pii_retention_days'] = max(1, (int) ($input['pii_retention_days'] ?? $result['pii_retention_days']));
         $result['altcha_hmac_secret'] = sanitize_text_field($input['altcha_hmac_secret'] ?? $result['altcha_hmac_secret']);
         $result['privacy_policy_url'] = esc_url_raw($input['privacy_policy_url'] ?? $result['privacy_policy_url']);
+        // Rate limiting (form-rendered; an absent checkbox means "off").
+        $result['rate_limit_enabled'] = !empty($input['rate_limit_enabled']);
+        $result['rate_limit_per_ip_day'] = absint($input['rate_limit_per_ip_day'] ?? $result['rate_limit_per_ip_day']);
+        $result['rate_limit_global_hour'] = absint($input['rate_limit_global_hour'] ?? $result['rate_limit_global_hour']);
 
         return $result;
     }
