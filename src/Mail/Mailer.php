@@ -5,7 +5,7 @@ namespace PortoSender\Mail;
 use PortoSender\Settings\Settings;
 use PortoSender\Postage\PostageProduct;
 
-class Mailer
+final class Mailer implements MailerInterface
 {
     public function __construct(private Settings $settings) {}
 

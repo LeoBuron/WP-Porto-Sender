@@ -6,7 +6,7 @@ use PortoSender\Captcha\CaptchaVerifier;
 use PortoSender\Limiting\RequestLimiter;
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Requests\RequestStore;
-use PortoSender\Mail\Mailer;
+use PortoSender\Mail\MailerInterface;
 use PortoSender\Support\Hasher;
 use PortoSender\Support\TokenGenerator;
 use PortoSender\Support\Clock;
@@ -20,7 +20,7 @@ final class IssuanceService
         private RequestLimiter $limiter,
         private CodeStore $codes,
         private RequestStore $requests,
-        private Mailer $mailer,
+        private MailerInterface $mailer,
         private Hasher $hasher,
         private TokenGenerator $tokens,
         private ConfirmLinkBuilder $links,

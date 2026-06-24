@@ -9,7 +9,7 @@ use PortoSender\Captcha\CaptchaVerifier;
 use PortoSender\Limiting\RequestLimiter;
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Requests\RequestStore;
-use PortoSender\Mail\Mailer;
+use PortoSender\Mail\MailerInterface;
 use PortoSender\Support\Hasher;
 use PortoSender\Support\TokenGenerator;
 use PortoSender\Support\Clock;
@@ -23,7 +23,7 @@ final class IssuanceSubmitTest extends MockeryTestCase
         $captcha = $mocks['captcha'] ?? Mockery::mock(CaptchaVerifier::class)->shouldReceive('verify')->andReturn(true)->getMock();
         $requests = $mocks['requests'] ?? Mockery::mock(RequestStore::class);
         $codes = $mocks['codes'] ?? Mockery::mock(CodeStore::class);
-        $mailer = $mocks['mailer'] ?? Mockery::mock(Mailer::class);
+        $mailer = $mocks['mailer'] ?? Mockery::mock(MailerInterface::class);
         $limiterStore = Mockery::mock(RequestStore::class)->shouldReceive('hasPriorRequest')->andReturn(false)->getMock();
         $limiter = $mocks['limiter'] ?? new RequestLimiter($limiterStore);
         $clock = Mockery::mock(Clock::class);
@@ -60,14 +60,16 @@ final class IssuanceSubmitTest extends MockeryTestCase
     public function test_captcha_failure(): void
     {
         $captcha = Mockery::mock(CaptchaVerifier::class)->shouldReceive('verify')->andReturn(false)->getMock();
-        [$svc] = $this->service(['captcha' => $captcha]);
+        [$svc, $m] = $this->service(['captcha' => $captcha]);
+        $m['requests']->shouldNotReceive('createPending');
         $this->assertSame('captcha_failed', $svc->submit($this->input())['status']);
     }
 
     public function test_duplicate_blocked(): void
     {
         $limiterStore = Mockery::mock(RequestStore::class)->shouldReceive('hasPriorRequest')->andReturn(true)->getMock();
-        [$svc] = $this->service(['limiter' => new RequestLimiter($limiterStore)]);
+        [$svc, $m] = $this->service(['limiter' => new RequestLimiter($limiterStore)]);
+        $m['requests']->shouldNotReceive('createPending');
         $this->assertSame('duplicate', $svc->submit($this->input())['status']);
     }
 
@@ -75,6 +77,8 @@ final class IssuanceSubmitTest extends MockeryTestCase
     {
         [$svc, $m] = $this->service();
         $m['codes']->shouldReceive('availableCount')->andReturn(0);
+        $m['requests']->shouldNotReceive('createPending');
+        $m['mailer']->shouldNotReceive('sendConfirmation');
         $this->assertSame('out_of_stock', $svc->submit($this->input())['status']);
     }
 }
