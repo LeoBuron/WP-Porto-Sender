@@ -97,4 +97,26 @@ final class CodeRepository
             $now->format('Y-m-d H:i:s'), $now->format('Y-m-d H:i:s')
         ));
     }
+
+    public function quarantineExpired(\DateTimeImmutable $now): int
+    {
+        $table = $this->table();
+        return (int) $this->wpdb->query($this->wpdb->prepare(
+            "UPDATE $table SET status='expired', updated_at=%s
+              WHERE status IN ('available','reserved') AND expires_on < %s",
+            $now->format('Y-m-d H:i:s'), $now->format('Y-m-d')
+        ));
+    }
+
+    /** @return array<object> */
+    public function findExpiring(\DateTimeImmutable $now, int $withinMonths): array
+    {
+        $table = $this->table();
+        $until = $now->modify("+{$withinMonths} months")->format('Y-m-d');
+        return $this->wpdb->get_results($this->wpdb->prepare(
+            "SELECT * FROM $table WHERE status='available' AND expires_on >= %s AND expires_on <= %s
+              ORDER BY expires_on ASC",
+            $now->format('Y-m-d'), $until
+        )) ?: [];
+    }
 }
