@@ -55,4 +55,23 @@ final class StockAlerterTest extends WpUnitTestCase
         $a->evaluate(); // recovered -> flag cleared
         $this->assertArrayNotHasKey('porto_sender_lowstock_grossbrief', $this->flags);
     }
+
+    public function test_partial_restock_rearms_so_out_of_stock_refires(): void
+    {
+        // out -> partial restock into the low band (re-arm to 'low', no duplicate alert)
+        // -> deplete back to 0 -> out-of-stock must fire AGAIN.
+        $codes = Mockery::mock(CodeStore::class);
+        $codes->shouldReceive('availableCount')->andReturn(0, 3, 0); // empty, partial (<=threshold 5), empty again
+        $mailer = Mockery::mock(MailerInterface::class);
+        $mailer->shouldReceive('sendOutOfStock')->twice()->andReturn(true); // fires on each depletion to 0
+        $mailer->shouldNotReceive('sendLowStock'); // silent re-arm, no low-stock alert on the restock
+        $a = $this->alerter($codes, $mailer);
+
+        $a->evaluate(); // out
+        $this->assertSame('out', $this->flags['porto_sender_lowstock_grossbrief']);
+        $a->evaluate(); // partial restock -> re-armed to 'low'
+        $this->assertSame('low', $this->flags['porto_sender_lowstock_grossbrief']);
+        $a->evaluate(); // depleted again -> out-of-stock re-fires
+        $this->assertSame('out', $this->flags['porto_sender_lowstock_grossbrief']);
+    }
 }

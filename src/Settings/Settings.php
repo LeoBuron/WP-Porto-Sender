@@ -62,22 +62,26 @@ final class Settings
 
     public static function sanitize(array $input): array
     {
-        $d = self::defaults();
-        return [
-            'owner_address' => sanitize_textarea_field($input['owner_address'] ?? $d['owner_address']),
-            'enabled_products' => array_values(array_intersect(self::PRODUCTS, (array) ($input['enabled_products'] ?? $d['enabled_products']))),
-            'low_stock_thresholds' => array_map('absint', (array) ($input['low_stock_thresholds'] ?? [])),
-            'default_low_stock' => max(0, (int) ($input['default_low_stock'] ?? $d['default_low_stock'])),
-            'alert_email' => sanitize_email($input['alert_email'] ?? ''),
-            'request_limit_mode' => in_array($input['request_limit_mode'] ?? '', self::MODES, true) ? $input['request_limit_mode'] : $d['request_limit_mode'],
-            'pii_retention_days' => max(1, (int) ($input['pii_retention_days'] ?? $d['pii_retention_days'])),
-            'captcha_provider' => in_array($input['captcha_provider'] ?? '', ['altcha', 'none'], true) ? $input['captcha_provider'] : 'altcha',
-            'altcha_hmac_secret' => sanitize_text_field($input['altcha_hmac_secret'] ?? ''),
-            'confirm_token_ttl_hours' => max(1, (int) ($input['confirm_token_ttl_hours'] ?? $d['confirm_token_ttl_hours'])),
-            'reservation_ttl_minutes' => max(1, (int) ($input['reservation_ttl_minutes'] ?? $d['reservation_ttl_minutes'])),
-            'expiry_warning_months' => max(1, (int) ($input['expiry_warning_months'] ?? $d['expiry_warning_months'])),
-            'privacy_policy_url' => esc_url_raw($input['privacy_policy_url'] ?? ''),
-            'hash_salt' => sanitize_text_field($input['hash_salt'] ?? ''),
-        ];
+        // Start from defaults merged over the currently stored option, then overwrite
+        // ONLY the keys the admin form actually renders. Keys not present in the form
+        // (hash_salt, default_low_stock, captcha_provider, confirm_token_ttl_hours,
+        // reservation_ttl_minutes, expiry_warning_months) MUST retain their stored
+        // values — wiping hash_salt would invalidate every email/name/token hash.
+        $existing = get_option(self::OPTION, []);
+        $result = array_merge(self::defaults(), is_array($existing) ? $existing : []);
+
+        // Form-rendered fields (see Admin\SettingsPage::render()).
+        $result['owner_address'] = sanitize_textarea_field($input['owner_address'] ?? $result['owner_address']);
+        // enabled_products is a checkbox group the form always renders; an absent key
+        // means "all unchecked" rather than "keep previous".
+        $result['enabled_products'] = array_values(array_intersect(self::PRODUCTS, (array) ($input['enabled_products'] ?? [])));
+        $result['low_stock_thresholds'] = array_map('absint', (array) ($input['low_stock_thresholds'] ?? $result['low_stock_thresholds']));
+        $result['request_limit_mode'] = in_array($input['request_limit_mode'] ?? '', self::MODES, true) ? $input['request_limit_mode'] : $result['request_limit_mode'];
+        $result['alert_email'] = sanitize_email($input['alert_email'] ?? $result['alert_email']);
+        $result['pii_retention_days'] = max(1, (int) ($input['pii_retention_days'] ?? $result['pii_retention_days']));
+        $result['altcha_hmac_secret'] = sanitize_text_field($input['altcha_hmac_secret'] ?? $result['altcha_hmac_secret']);
+        $result['privacy_policy_url'] = esc_url_raw($input['privacy_policy_url'] ?? $result['privacy_policy_url']);
+
+        return $result;
     }
 }

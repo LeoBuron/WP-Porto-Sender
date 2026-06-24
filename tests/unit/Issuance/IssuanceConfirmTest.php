@@ -69,6 +69,27 @@ final class IssuanceConfirmTest extends MockeryTestCase
         $this->assertSame('issued', $svc->confirm('t')['status']);
     }
 
+    public function test_email_failure_does_not_spend_code(): void
+    {
+        // If the delivery email fails, the code must stay 'reserved' (neither codes nor
+        // requests are marked issued) so the cron reclaims it and the token can be retried.
+        $requests = Mockery::mock(RequestStore::class);
+        $requests->shouldReceive('findByTokenHash')->andReturn((object) [
+            'id' => 42, 'status' => 'pending', 'product' => 'grossbrief', 'email' => 'v@e.de',
+            'name' => 'Vera', 'email_hash' => 'EHASH', 'created_at' => '2026-06-24 09:30:00',
+        ]);
+        $requests->shouldReceive('markConfirmed')->once()->andReturn(true);
+        $requests->shouldNotReceive('markIssued');
+        $codes = Mockery::mock(CodeStore::class);
+        $codes->shouldReceive('claimOne')->once()->andReturn(7);
+        $codes->shouldReceive('getCode')->with(7)->andReturn((object) ['code' => 'AB12CD34']);
+        $codes->shouldNotReceive('markIssued');
+        $mailer = Mockery::mock(MailerInterface::class);
+        $mailer->shouldReceive('sendDelivery')->once()->andReturn(false);
+        $svc = $this->service($codes, $requests, $mailer);
+        $this->assertSame('email_failed', $svc->confirm('t')['status']);
+    }
+
     public function test_out_of_stock_when_claim_fails(): void
     {
         $requests = Mockery::mock(RequestStore::class);

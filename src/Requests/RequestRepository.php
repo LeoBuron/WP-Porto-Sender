@@ -63,7 +63,7 @@ final class RequestRepository implements RequestStore
         if ($emailHash !== null) { $clauses[] = 'email_hash=%s'; $args[] = $emailHash; }
         if ($nameHash !== null) { $clauses[] = 'name_hash=%s'; $args[] = $nameHash; }
         if ($clauses === []) { return false; }
-        $sql = "SELECT COUNT(*) FROM {$this->table()} WHERE status<>'rejected' AND (" . implode(' OR ', $clauses) . ')';
+        $sql = "SELECT COUNT(*) FROM {$this->table()} WHERE status IN ('confirmed','issued') AND (" . implode(' OR ', $clauses) . ')';
         return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$args)) > 0;
     }
 

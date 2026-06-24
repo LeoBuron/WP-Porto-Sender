@@ -28,12 +28,34 @@ final class RequestRepositoryTest extends PortoTestCase
         $this->assertSame('issued', $this->repo->findById($id)->status);
     }
 
-    public function test_dedup_by_either_hash(): void
+    public function test_pending_does_not_block_dedup(): void
     {
+        // A merely pending (unconfirmed) request must NOT block — otherwise a mistyped or
+        // never-confirmed request would lock the person out for the token TTL.
         $this->pending(str_repeat('e',64), str_repeat('n',64), str_repeat('t',64));
+        $this->assertFalse($this->repo->hasPriorRequest(str_repeat('e',64), null));
+        $this->assertFalse($this->repo->hasPriorRequest(null, str_repeat('n',64)));
+    }
+
+    public function test_dedup_by_either_hash_once_confirmed_or_issued(): void
+    {
+        $now = new \DateTimeImmutable('2026-06-24 10:05:00');
+
+        // A confirmed request blocks.
+        $confirmed = $this->pending(str_repeat('e',64), str_repeat('n',64), str_repeat('t',64));
+        $this->repo->markConfirmed($confirmed, $now);
         $this->assertTrue($this->repo->hasPriorRequest(str_repeat('e',64), str_repeat('z',64)));
         $this->assertTrue($this->repo->hasPriorRequest(null, str_repeat('n',64)));
-        $this->assertFalse($this->repo->hasPriorRequest(str_repeat('z',64), null));
+
+        // An issued request blocks too.
+        $issued = $this->pending(str_repeat('x',64), str_repeat('y',64), str_repeat('u',64));
+        $this->repo->markConfirmed($issued, $now);
+        $this->repo->markIssued($issued, 1, $now);
+        $this->assertTrue($this->repo->hasPriorRequest(str_repeat('x',64), null));
+        $this->assertTrue($this->repo->hasPriorRequest(null, str_repeat('y',64)));
+
+        // Unknown hashes and the no-hash case never block.
+        $this->assertFalse($this->repo->hasPriorRequest(str_repeat('q',64), null));
         $this->assertFalse($this->repo->hasPriorRequest(null, null));
     }
 

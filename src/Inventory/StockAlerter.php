@@ -37,7 +37,11 @@ final class StockAlerter
                     update_option($flagKey, 'out');
                 }
             } elseif ($available <= $threshold) {
-                if ($flag !== 'low' && $flag !== 'out') {
+                if ($flag === 'out') {
+                    // Partial restock after an out-of-stock alert: re-arm to 'low' silently
+                    // (no duplicate alert) so a later drop back to 0 re-fires out-of-stock.
+                    update_option($flagKey, 'low');
+                } elseif ($flag !== 'low') {
                     $this->mailer->sendLowStock($to, $product->label, $available);
                     update_option($flagKey, 'low');
                 }

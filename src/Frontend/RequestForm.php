@@ -11,7 +11,7 @@ final class RequestForm
 
     public function enqueueAssets(): void
     {
-        $base = plugins_url('assets/', dirname(__DIR__) . '/porto-sender.php');
+        $base = plugins_url('assets/', dirname(__DIR__, 2) . '/porto-sender.php');
         wp_enqueue_script('porto-altcha', $base . 'altcha.min.js', [], '1.0.0', true);
         wp_enqueue_script('porto-form', $base . 'porto-form.js', ['porto-altcha'], '1.0.0', true);
     }

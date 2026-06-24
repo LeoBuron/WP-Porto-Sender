@@ -11,6 +11,7 @@ final class ConfirmHandler
         'already_issued' => 'Du hast deinen Porto-Code bereits erhalten.',
         'expired' => 'Dieser Bestätigungslink ist abgelaufen. Bitte stelle eine neue Anfrage.',
         'out_of_stock' => 'Aktuell sind keine Codes verfügbar. Bitte versuche es später erneut.',
+        'email_failed' => 'Der Versand ist fehlgeschlagen. Bitte versuche es später erneut.',
         'invalid_token' => 'Dieser Bestätigungslink ist ungültig.',
     ];
 

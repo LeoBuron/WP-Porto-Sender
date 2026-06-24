@@ -101,12 +101,19 @@ final class IssuanceService
             return ['status' => 'out_of_stock'];
         }
 
-        $this->codes->markIssued($codeId, (int) $req->id, (string) $req->email_hash, $now);
-        $this->requests->markIssued((int) $req->id, $codeId, $now);
-
         $code = $this->codes->getCode($codeId);
         $product = $this->catalog->get($req->product);
-        $this->mailer->sendDelivery((string) $req->email, (string) $req->name, (string) $code->code, $product);
+
+        // Only mark the code/request 'issued' AFTER the delivery email succeeds. If the
+        // send fails, leave the code in its 'reserved' state so releaseStaleReservations
+        // reclaims it on cron — the visitor keeps a valid token to retry (spec §15).
+        $sent = $this->mailer->sendDelivery((string) $req->email, (string) $req->name, (string) $code->code, $product);
+        if (!$sent) {
+            return ['status' => 'email_failed'];
+        }
+
+        $this->codes->markIssued($codeId, (int) $req->id, (string) $req->email_hash, $now);
+        $this->requests->markIssued((int) $req->id, $codeId, $now);
 
         return ['status' => 'issued'];
     }

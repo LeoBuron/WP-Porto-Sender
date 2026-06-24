@@ -32,6 +32,11 @@ final class RequestFlowTest extends PortoTestCase
 
     public function test_submit_then_confirm_issues_a_code(): void
     {
+        // The test container has no mail transport, so short-circuit wp_mail to succeed —
+        // otherwise sendDelivery() would fail and confirm() would (correctly) refuse to
+        // spend the code. We exercise the success path here.
+        add_filter('pre_wp_mail', '__return_true');
+
         [$svc, $codes, $requests] = $this->service();
         $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['POOLCODE1']);
 
@@ -51,6 +56,30 @@ final class RequestFlowTest extends PortoTestCase
         // ConfirmHandler delegates to the service.
         $handler = new ConfirmHandler($svc);
         $this->assertSame('already_issued', $handler->process('KNOWNTOKEN'));
+    }
+
+    public function test_confirm_does_not_spend_code_when_email_fails(): void
+    {
+        // Force wp_mail to fail: the code must stay reserved (still claimable later via
+        // releaseStaleReservations) rather than being spent on a delivery that never arrived.
+        add_filter('pre_wp_mail', '__return_false');
+
+        [$svc, $codes, $requests] = $this->service();
+        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['POOLCODE2']);
+
+        $hasher = new Hasher('salt');
+        $reqId = $requests->createPending([
+            'name' => 'Vera', 'email' => 'v@example.de',
+            'email_hash' => $hasher->email('v@example.de'), 'name_hash' => $hasher->name('Vera'),
+            'product' => 'grossbrief', 'token_hash' => $hasher->token('FAILTOKEN'),
+            'ip_hash' => null, 'created_at' => (new SystemClock())->now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $result = $svc->confirm('FAILTOKEN');
+        $this->assertSame('email_failed', $result['status']);
+        // Request was confirmed but NOT issued; the code was not spent.
+        $this->assertSame('confirmed', $requests->findById($reqId)->status);
+        $this->assertSame(0, $codes->availableCount('grossbrief', new \DateTimeImmutable('now'))); // reserved, not available
     }
 
     public function test_rest_submit_creates_pending_request(): void
