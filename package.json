@@ -6,5 +6,10 @@
     "env:start": "wp-env start",
     "test:integration": "wp-env run tests-cli --env-cwd=wp-content/plugins/wp-porto-sender ./vendor/bin/phpunit -c phpunit-integration.xml"
   },
-  "devDependencies": { "@wordpress/env": "^10" }
+  "devDependencies": {
+    "@wordpress/env": "^10"
+  },
+  "dependencies": {
+    "altcha": "^3.1.0"
+  }
 }
