@@ -15,7 +15,7 @@ use PortoSender\Mail\Mailer;
 use PortoSender\Issuance\{IssuanceService, UrlConfirmLinkBuilder};
 use PortoSender\Rest\RestController;
 use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar};
-use PortoSender\Admin\{SettingsPage, CodeIntakePage, Dashboard};
+use PortoSender\Admin\{SettingsPage, CodeIntakePage, Dashboard, ToolsPage};
 use PortoSender\Cron\Maintenance;
 
 final class Plugin
@@ -76,6 +76,7 @@ final class Plugin
             (new SettingsPage())->register();
             (new CodeIntakePage($codes, $catalog))->register();
             (new Dashboard($codes, $catalog, $s))->register();
+            (new ToolsPage($codes, $requests))->register();
         }
     }
 

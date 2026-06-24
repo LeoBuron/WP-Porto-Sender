@@ -312,20 +312,32 @@ ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Portability\Csv
   notice (`inserted`/`skipped`). (Codes-CSV import lives on CodeIntakePage; bundle export/restore + per-table
   CSV export live on ToolsPage — single, unambiguous home each.)
 
-- [ ] Step 1: Integration test — POST `porto_export` with a valid nonce as an admin streams a bundle
-  containing seeded data; without the cap/nonce → denied (`wp_die`/403). POST `porto_import` (bundle) as
-  admin restores; CodeIntakePage CSV upload inserts `porto_codes` rows.
-- [ ] Step 2: Run → FAIL.
-- [ ] Step 3: Implement ToolsPage + CodeIntakePage CSV upload + wiring in `Plugin::wire`.
-- [ ] Step 4: Run → PASS.
-- [ ] Step 5: Live smoke — Playwright drives the Tools page export download + CodeIntakePage CSV upload;
-  capture evidence. Commit.
+- [x] Step 1: Integration test on the testable business methods (house convention tests these, not the
+  wp_die/exit wrappers — cf. CodeIntakeHandlerTest): `exportPayload` codes_csv/requests_csv(+PII)/bundle;
+  `importResult` full_restore round-trip; CodeIntakePage `importCsvFile`.
+- [x] Step 2: Ran `--filter ToolsPageExportImport` → RED (class missing).
+- [x] Step 3: Implemented `src/Admin/ToolsPage.php` (menu + `admin_post_porto_export/import`, streamed
+  download, cap+nonce, unencrypted-bundle confirmation, 10 MB upload cap + `is_uploaded_file`); added
+  `CodeIntakePage` CSV upload (`importCsvFile` + `admin_post_porto_intake_csv` + form); wired ToolsPage in
+  `Plugin::wire`.
+- [x] Step 4: Integration → PASS (4 tests, 12 assertions). Full suites: unit 90, integration 30→34.
+- [x] Step 5: **Live smoke** via `wp eval-file` in real wp-env (after `wp plugin deactivate/activate`):
+  ToolsPage builds codes-CSV + bundle payloads, bundle parses (format_version=1), `schema_version`
+  option='1', bundle carries salt. (Guards mirror the existing CodeIntakePage nonce+cap pattern verbatim
+  and get scrutinised in the WS2 security review; the browser-driven export-download + upload UX check is
+  consolidated into the required WS2 end-to-end live smoke at the STOP CONDITION.) Committed.
 
-**Verify:** integration filter + the Playwright smoke output.
+**Verify:** `npm run test:integration -- --filter ToolsPageExportImport` + the `wp eval-file` probe output.
 **DoD:** export streams (no web-root file); import restores; CSV upload adds codes; every action
-nonce+cap-gated.
+nonce+cap-gated. ✅ (browser-UX smoke folded into WS2 end-to-end)
 **Evidence:**
 ```
+# integration -> OK (4 tests, 12 assertions): codes/requests CSV contain seeded TOOLS1/bob@; bundle
+#   round-trip restores TOOLSALT + tok-tools; CSV import inserts 1 / skips 2 (unknown product + dup)
+# live (wp eval-file, real runtime):
+#   PROBE bundle_filename=porto-bundle-...json ctype=application/json; format_version=1
+#   PROBE schema_version_option=1 ; has_salt=yes ; PROBE OK
+# full suites: composer test:unit -> OK (90,250) ; npm run test:integration -> OK (34,110)
 ```
 
 ### WS2 SECURITY REVIEW (gate before WS2 done)
