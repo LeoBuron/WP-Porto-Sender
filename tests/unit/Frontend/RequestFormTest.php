@@ -27,6 +27,8 @@ final class RequestFormTest extends WpUnitTestCase
         $this->assertStringContainsString('Großbrief', $html);
         $this->assertStringNotContainsString('Standardbrief', $html); // not enabled
         $this->assertStringContainsString('altcha-widget', $html);
+        $this->assertStringContainsString('challenge=', $html);       // v3 widget attribute
+        $this->assertStringNotContainsString('challengeurl=', $html); // v2 attribute removed
         $this->assertStringContainsString('name="porto_product"', $html);
         $this->assertStringContainsString('datenschutz', $html); // privacy link
         $this->assertStringContainsString('type="checkbox"', $html); // consent

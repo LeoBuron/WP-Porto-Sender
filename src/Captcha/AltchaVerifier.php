@@ -21,8 +21,8 @@ use AltchaOrg\Altcha\Algorithm\Pbkdf2;
  *
  * Wire format notes (v2 library):
  * - createChallenge() returns a Challenge value object with ->parameters and ->signature.
- * - We expose the challenge array with keys 'challenge' (the parameters array) and
- *   'signature' to match the contract required by the ALTCHA widget and our tests.
+ * - challenge() returns Challenge::toArray() directly, giving top-level keys
+ *   'parameters' and 'signature' — the shape expected by the v3 ALTCHA widget.
  * - Payload(Challenge $challenge, Solution $solution) — no array constructor in v2.
  */
 final class AltchaVerifier implements CaptchaVerifier
@@ -47,12 +47,9 @@ final class AltchaVerifier implements CaptchaVerifier
             expiresAt: time() + 600,
         ));
 
-        // Map the v2 Challenge structure onto the expected wire format:
-        // 'challenge' = the parameters array, 'signature' = the HMAC signature.
-        return [
-            'challenge' => $challenge->parameters->toArray(),
-            'signature' => $challenge->signature,
-        ];
+        // Return the library's native Challenge::toArray() shape so the top-level keys
+        // are 'parameters' and 'signature' — the shape the v3 ALTCHA widget expects.
+        return json_decode(json_encode($challenge->toArray()), true);
     }
 
     public function verify(string $payload): bool

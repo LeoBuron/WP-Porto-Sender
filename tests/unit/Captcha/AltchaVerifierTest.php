@@ -18,8 +18,9 @@ final class AltchaVerifierTest extends TestCase
     {
         $v = new AltchaVerifier('a-test-secret');
         $challenge = $v->challenge();
-        $this->assertArrayHasKey('challenge', $challenge);
+        $this->assertArrayHasKey('parameters', $challenge);
         $this->assertArrayHasKey('signature', $challenge);
+        $this->assertArrayNotHasKey('challenge', $challenge);
         $this->assertFalse($v->verify('not-a-valid-payload'));
         $this->assertFalse($v->verify(''));
     }

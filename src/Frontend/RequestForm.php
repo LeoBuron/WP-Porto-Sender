@@ -13,7 +13,7 @@ final class RequestForm
     {
         $base = plugins_url('assets/', dirname(__DIR__) . '/porto-sender.php');
         wp_enqueue_script('porto-altcha', $base . 'altcha.min.js', [], '1.0.0', true);
-        wp_enqueue_script('porto-form', $base . 'porto-form.js', [], '1.0.0', true);
+        wp_enqueue_script('porto-form', $base . 'porto-form.js', ['porto-altcha'], '1.0.0', true);
     }
 
     public function render(array $atts): string
@@ -36,7 +36,7 @@ final class RequestForm
         <?php echo esc_html($p->label . ' – ' . $p->limits); ?></label><br>
     <?php endforeach; ?>
   </fieldset>
-  <altcha-widget challengeurl="<?php echo esc_attr($challengeUrl); ?>"></altcha-widget>
+  <altcha-widget challenge="<?php echo esc_attr($challengeUrl); ?>"></altcha-widget>
   <p><label><input type="checkbox" name="porto_consent" required>
     <?php echo esc_html__('Ich bin einverstanden, dass mein Name und meine E-Mail zur Zusendung des Codes verarbeitet werden.', 'wp-porto-sender'); ?>
     <?php if ($privacy !== ''): ?><a href="<?php echo esc_url($privacy); ?>" target="_blank"><?php echo esc_html__('Datenschutz', 'wp-porto-sender'); ?></a><?php endif; ?>
