@@ -1,0 +1,55 @@
+--- a/vendor/wp-phpunit/wp-phpunit/includes/abstract-testcase.php
++++ b/vendor/wp-phpunit/wp-phpunit/includes/abstract-testcase.php
+@@ -583,22 +583,23 @@ abstract class WP_UnitTestCase_Base extends PHPUnit_Adapter_TestCase {
+ 	 * @since 3.7.0
+ 	 */
+ 	public function expectDeprecated() {
+-		if ( method_exists( $this, 'getAnnotations' ) ) {
+-			// PHPUnit < 9.5.0.
+-			$annotations = $this->getAnnotations();
+-		} else {
+-			// PHPUnit >= 9.5.0.
+-			$annotations = \PHPUnit\Util\Test::parseTestMethodAnnotations(
+-				static::class,
+-				$this->getName( false )
+-			);
+-		}
+-
+-		foreach ( array( 'class', 'method' ) as $depth ) {
+-			if ( ! empty( $annotations[ $depth ]['expectedDeprecated'] ) ) {
+-				$this->expected_deprecated = array_merge(
+-					$this->expected_deprecated,
+-					$annotations[ $depth ]['expectedDeprecated']
+-				);
+-			}
+-
+-			if ( ! empty( $annotations[ $depth ]['expectedIncorrectUsage'] ) ) {
+-				$this->expected_doing_it_wrong = array_merge(
+-					$this->expected_doing_it_wrong,
+-					$annotations[ $depth ]['expectedIncorrectUsage']
+-				);
+-			}
+-		}
++		// PHPUnit 10+ removed \PHPUnit\Util\Test::parseTestMethodAnnotations() and getAnnotations().
++		// Annotation-based @expectedDeprecated/@expectedIncorrectUsage are not used in this plugin's
++		// tests, so we skip annotation parsing entirely for PHPUnit 10+ compatibility.
++		if ( method_exists( $this, 'getAnnotations' ) ) {
++			// PHPUnit < 9.5.0.
++			$annotations = $this->getAnnotations();
++			foreach ( array( 'class', 'method' ) as $depth ) {
++				if ( ! empty( $annotations[ $depth ]['expectedDeprecated'] ) ) {
++					$this->expected_deprecated = array_merge(
++						$this->expected_deprecated,
++						$annotations[ $depth ]['expectedDeprecated']
++					);
++				}
++
++				if ( ! empty( $annotations[ $depth ]['expectedIncorrectUsage'] ) ) {
++					$this->expected_doing_it_wrong = array_merge(
++						$this->expected_doing_it_wrong,
++						$annotations[ $depth ]['expectedIncorrectUsage']
++					);
++				}
++			}
++		}
++		// PHPUnit >= 10.0: annotation-based @expectedDeprecated is not supported; skip.
