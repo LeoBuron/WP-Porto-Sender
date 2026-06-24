@@ -2,12 +2,14 @@ document.querySelectorAll('.porto-request-form').forEach((form) => {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const msg = form.querySelector('.porto-message');
-    const altcha = form.querySelector('altcha-widget');
+    // The ALTCHA widget exposes its solved payload via a hidden <input name="altcha">
+    // it injects into the form (not via a property on the custom element).
+    const altchaInput = form.querySelector('input[name="altcha"]');
     const payload = {
       name: form.porto_name.value,
       email: form.porto_email.value,
       product: (form.querySelector('input[name="porto_product"]:checked') || {}).value,
-      captcha: altcha ? (altcha.value || '') : '',
+      captcha: altchaInput ? altchaInput.value : '',
     };
     const res = await fetch(form.dataset.endpoint, {
       method: 'POST',
