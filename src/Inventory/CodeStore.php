@@ -15,4 +15,8 @@ interface CodeStore
     public function quarantineExpired(\DateTimeImmutable $now): int;
     /** @return array<object> */
     public function findExpiring(\DateTimeImmutable $now, int $withinMonths): array;
+    /** @return array<object> */
+    public function recentIssued(int $limit): array;
+    /** @return array<object> */
+    public function findBelowValue(string $product, int $minCents): array;
 }

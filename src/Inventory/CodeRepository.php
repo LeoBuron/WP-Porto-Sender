@@ -119,4 +119,23 @@ final class CodeRepository implements CodeStore
             $now->format('Y-m-d'), $until
         )) ?: [];
     }
+
+    /** @return array<object> */
+    public function recentIssued(int $limit): array
+    {
+        $table = $this->table();
+        return $this->wpdb->get_results($this->wpdb->prepare(
+            "SELECT * FROM $table WHERE status='issued' ORDER BY issued_at DESC LIMIT %d", $limit
+        )) ?: [];
+    }
+
+    /** @return array<object> */
+    public function findBelowValue(string $product, int $minCents): array
+    {
+        $table = $this->table();
+        return $this->wpdb->get_results($this->wpdb->prepare(
+            "SELECT * FROM $table WHERE product=%s AND status='available' AND value_cents < %d ORDER BY value_cents ASC",
+            $product, $minCents
+        )) ?: [];
+    }
 }
