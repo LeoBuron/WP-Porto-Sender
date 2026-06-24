@@ -4,7 +4,7 @@ namespace PortoSender\Requests;
 
 use PortoSender\Persistence\Schema;
 
-final class RequestRepository
+final class RequestRepository implements RequestStore
 {
     public function __construct(private \wpdb $wpdb) {}
 

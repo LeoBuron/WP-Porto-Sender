@@ -5,7 +5,7 @@ namespace PortoSender\Inventory;
 use PortoSender\Persistence\Schema;
 use PortoSender\Postage\Expiry;
 
-final class CodeRepository
+final class CodeRepository implements CodeStore
 {
     public function __construct(private \wpdb $wpdb) {}
 
