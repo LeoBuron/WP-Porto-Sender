@@ -2,6 +2,13 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 3 — Tasks 7–8 DONE.** (7) ExportService (per-table CSV + lossless bundle
+  builders; added repo `allRows()` + `Settings::toArray()`); (8) ImportService (full_restore + data_merge;
+  validation-before-destruction; repo `deleteAll()`/`insertRows()` with column allowlist; D15.1/D15.2).
+  **Salt-portability round-trip proven** in integration (export→wipe+new salt→full_restore→source salt &
+  token restored). Unit 81→90, integration 27→30, all green; no regressions.
+  **Next:** Task 9 (ToolsPage export/import UI + admin-post streaming + CodeIntakePage CSV upload), then the
+  WS2 SECURITY REVIEW gate → WS2 done.
 - **2026-06-25 · PHASE B iter 2 — Tasks 4–6 DONE.** (4) CodesCsvImporter (per-row addBatch, exact skip
   attribution — D13.1); (5) BundleSerializer (lossless JSON incl. salt, version-guarded); (6) BundleCrypto
   (optional libsodium passphrase encryption, no new dep). Unit 65→81, all green; no regressions.
@@ -17,7 +24,7 @@
   migration runner). Build order WS2 → WS1 → WS4 → WS3.
 
 ## Workstream status
-- WS2 (portability / spine): **in progress** — Tasks 1–6 ✅; Tasks 7–9 + SEC pending.
+- WS2 (portability / spine): **in progress** — Tasks 1–8 ✅; Task 9 (ToolsPage UI) + SEC pending.
 - WS1 (admin notification): not started — Tasks 10–13 + SEC.
 - WS4 (uninstall & lifecycle): not started — Tasks 14–16 + SEC.
 - WS3 (geo, default-off): not started — Tasks 17–20 + SEC.

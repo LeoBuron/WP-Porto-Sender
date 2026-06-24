@@ -31,6 +31,38 @@ final class CodeRepository implements CodeStore
         return $inserted;
     }
 
+    /** @return array<int,array<string,mixed>> */
+    public function allRows(): array
+    {
+        $table = $this->table();
+        return $this->wpdb->get_results("SELECT * FROM $table ORDER BY id", ARRAY_A) ?: [];
+    }
+
+    /** Real columns of porto_codes — the allowlist for untrusted bundle import. */
+    private const COLUMNS = [
+        'id', 'product', 'value_cents', 'purchase_date', 'expires_on', 'code', 'status',
+        'reserved_until', 'issued_to_hash', 'issued_at', 'request_id', 'created_at', 'updated_at',
+    ];
+
+    public function deleteAll(): int
+    {
+        $table = $this->table();
+        return (int) $this->wpdb->query("DELETE FROM $table");
+    }
+
+    public function insertRows(array $rows): int
+    {
+        $table = $this->table();
+        $allowed = array_flip(self::COLUMNS);
+        $inserted = 0;
+        foreach ($rows as $row) {
+            $cols = array_intersect_key($row, $allowed); // never trust columns from input
+            if ($cols === []) { continue; }
+            $inserted += $this->wpdb->insert($table, $cols) ? 1 : 0;
+        }
+        return $inserted;
+    }
+
     public function availableCount(string $product, \DateTimeImmutable $now): int
     {
         $table = $this->table();

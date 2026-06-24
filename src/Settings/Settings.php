@@ -21,6 +21,12 @@ final class Settings
         return new self(is_array($stored) ? $stored : []);
     }
 
+    /** The full settings array (defaults merged with stored values), incl. hash_salt. */
+    public function toArray(): array
+    {
+        return $this->values;
+    }
+
     public static function defaults(): array
     {
         return [

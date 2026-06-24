@@ -19,6 +19,11 @@ final class BundleCrypto
 {
     private const MAGIC = 'PORTOENC1';
 
+    public static function isEncrypted(string $blob): bool
+    {
+        return str_starts_with($blob, self::MAGIC);
+    }
+
     public static function available(): bool
     {
         return function_exists('sodium_crypto_secretbox')

@@ -10,6 +10,38 @@ final class RequestRepository implements RequestStore
 
     private function table(): string { return Schema::requestsTable($this->wpdb); }
 
+    /** @return array<int,array<string,mixed>> */
+    public function allRows(): array
+    {
+        $table = $this->table();
+        return $this->wpdb->get_results("SELECT * FROM $table ORDER BY id", ARRAY_A) ?: [];
+    }
+
+    /** Real columns of porto_requests — the allowlist for untrusted bundle import. */
+    private const COLUMNS = [
+        'id', 'name', 'email', 'email_hash', 'name_hash', 'product', 'status',
+        'token_hash', 'ip_hash', 'code_id', 'created_at', 'confirmed_at', 'issued_at',
+    ];
+
+    public function deleteAll(): int
+    {
+        $table = $this->table();
+        return (int) $this->wpdb->query("DELETE FROM $table");
+    }
+
+    public function insertRows(array $rows): int
+    {
+        $table = $this->table();
+        $allowed = array_flip(self::COLUMNS);
+        $inserted = 0;
+        foreach ($rows as $row) {
+            $cols = array_intersect_key($row, $allowed); // never trust columns from input
+            if ($cols === []) { continue; }
+            $inserted += $this->wpdb->insert($table, $cols) ? 1 : 0;
+        }
+        return $inserted;
+    }
+
     public function createPending(array $data): int
     {
         $this->wpdb->insert($this->table(), [

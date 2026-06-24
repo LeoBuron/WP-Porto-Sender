@@ -80,6 +80,18 @@ explicit user action) are implemented **disabled-by-default behind a setting** a
   the imported set won't resolve). — Full restore is the only path that is actually lossless; data-only
   merge re-introduces the salt-mismatch the whole design exists to avoid, so it's a clearly-labelled
   secondary. — reversible.
+- **D15.1 [WS2] — full_restore clears tables itself, not via DataEraser (impl, 2026-06-25)** → ImportService's
+  full_restore empties the two data tables with `DELETE FROM` (via repo `deleteAll()`) and re-inserts, rather
+  than calling a DataEraser data-only purge or `Schema::uninstall`+`install`. — (1) DELETE is DML so it is
+  transaction-safe (DROP/TRUNCATE implicitly commit in MySQL, which would break the per-test rollback and
+  risk a half-applied restore in production); (2) the tables already exist from activation, so a restore only
+  needs to replace *contents* + settings + salt + schema_version; (3) avoids a forward dependency on DataEraser
+  (Task 14). DataEraser remains the single owner of the FULL purge (options/transients/cron) for uninstall +
+  delete-all — no overlap. — reversible.
+- **D15.2 [WS2] — Bundle import column allowlist (security, impl)** → repo `insertRows()` intersects each
+  bundle row against a per-table column constant before `$wpdb->insert`, so untrusted bundle keys can never
+  become SQL column identifiers. — satisfies the "never trust columns" import rule; proven by an integration
+  test that feeds a bogus `evil_column` and confirms it is dropped. — reversible.
 - **D16 [WS2] — Import safety** → validate uploaded file MIME + extension + size cap + row cap;
   parse strictly as CSV/JSON text (never `unserialize`/`eval`); reject embedded PHP/serialized
   payloads; sanitize the filename (no path traversal); handle the upload via WP's tempfile and

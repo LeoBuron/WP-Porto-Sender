@@ -239,18 +239,23 @@ ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Portability\Csv
   available). Streaming (headers + `echo` + `exit`) lives in `ToolsPage` (Task 9), not here, so the
   builders stay unit-testable.
 
-- [ ] Step 1: Unit test (fake repos) — `codesCsv`/`requestsCsv` contain headers + rows and are
-  formula-escaped; `bundle(null)` is parseable JSON incl. salt; `bundle('pw')` is encrypted (not valid
-  JSON, decryptable with 'pw').
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Add repo `allRows()` accessors (prepared `SELECT *`); implement `ExportService`.
-- [ ] Step 4: Run unit → PASS.
-- [ ] Step 5: Integration — seed a code + a request, assert CSV/bundle contain them. Run → PASS. Commit.
+- [x] Step 1: Unit test (mocked `CodeStore`/`RequestStore` + real `Settings`) — codes/requests CSV have
+  headers + formula-escaped cells + PII columns; empty table → empty CSV; `bundle(null)` parseable JSON
+  incl. salt + site_url; `bundle('pw')` encrypted (PORTOENC1) and decryptable.
+- [x] Step 2: Ran `--filter ExportService` → RED (5 errors, class missing).
+- [x] Step 3: Added `allRows()` to `CodeStore`/`RequestStore` + repos (`SELECT * ORDER BY id`, ARRAY_A);
+  `Settings::toArray()`; implemented `src/Portability/ExportService.php`.
+- [x] Step 4: Unit → PASS (5 tests, 12 assertions).
+- [x] Step 5: Integration — seeded a real code + request, asserted CSV/bundle contain them (exercises real
+  `allRows()`). PASS (1 test, 9 assertions). Committed.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter ExportService` + integration filter.
-**DoD:** CSV + bundle builders produce correct, escaped, lossless output; PII/salt present in bundle.
+**DoD:** CSV + bundle builders produce correct, escaped, lossless output; PII/salt present in bundle. ✅
 **Evidence:**
 ```
+# unit RED -> 5 errors (class missing); GREEN -> OK (5 tests, 12 assertions)
+# integration (wp-env) -> OK (1 test, 9 assertions): seeded EXPORTME1 + Alice present in CSV + bundle;
+#   bundle settings.hash_salt == 'REALSALT'
 ```
 
 ### Task 8: `ImportService` — validate + dispatch (CSV codes / bundle restore)
@@ -268,19 +273,28 @@ ERRORS! Tests: 5, Assertions: 0, Errors: 5.  (Class "PortoSender\Portability\Csv
   insert-ignore codes+requests, keep local settings/salt (return a `salt_mismatch_warning`). Validation
   (parse/version) happens **before** any destructive step. Returns `['mode','codes','requests','warnings'=>[]]`.
 
-- [ ] Step 1: Unit test — a malformed/blob-with-wrong-version aborts with no side effects (fake repos
-  assert no writes); `full_restore` calls purge→install→insert→settings in order (spy ordering);
-  `data_merge` returns the salt-mismatch warning and does NOT overwrite settings.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement `ImportService`.
-- [ ] Step 4: Run unit → PASS.
-- [ ] Step 5: Integration — export bundle (Task 7) → mutate DB → `importBundle(full_restore)` →
-  assert codes/requests/settings (incl. salt) restored. Run → PASS. Commit.
+- [x] Step 1: Unit test (`WpUnitTestCase`+Mockery+brain/monkey, shared call-log) — malformed bundle aborts
+  with zero side effects (`update_option` never, repos never); `full_restore` order =
+  deleteAll×2 → insertRows×2 → update_option(settings) → update_option(schema_version); `data_merge`
+  inserts, never clears/overwrites settings, returns salt-mismatch warning; encrypted bundle w/o
+  passphrase throws before side effects.
+- [x] Step 2: Ran `--filter ImportService` → RED (4 errors, class missing).
+- [x] Step 3: Implemented `src/Portability/ImportService.php` + repo `deleteAll()`/`insertRows()`
+  (column-allowlisted) + `BundleCrypto::isEncrypted`. **D15.1:** full_restore clears via DELETE (DML,
+  txn-safe) not DataEraser/DROP — tables already exist; restore only replaces contents + settings + salt.
+- [x] Step 4: Unit → PASS (4 tests, 21 assertions).
+- [x] Step 5: Integration — seed+salt → export → wipe + change salt → full_restore → data + SOURCESALT
+  back, `findByTokenHash('tok-orig')` resolves (salt portability proven); bonus: bogus bundle column
+  ignored by the allowlist. PASS (2 tests, 10 assertions). Committed.
 
 **Verify:** unit filter + integration filter.
-**DoD:** validation precedes destruction; full-restore is lossless incl. salt; merge warns about salt.
+**DoD:** validation precedes destruction; full-restore is lossless incl. salt; merge warns about salt. ✅
 **Evidence:**
 ```
+# unit RED -> 4 errors; GREEN -> OK (4 tests, 21 assertions) [order spy + no-side-effect aborts]
+# integration (wp-env) -> OK (2 tests, 10 assertions): SOURCESALT restored, token row resolves,
+#   untrusted 'evil_column' dropped by the per-table allowlist
+# full suites after Tasks 7-8: unit OK (90, 250) ; integration OK (30, 98)
 ```
 
 ### Task 9: `ToolsPage` — Export/Import UI + admin-post actions; CodeIntakePage CSV upload

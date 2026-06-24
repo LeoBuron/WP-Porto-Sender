@@ -12,4 +12,10 @@ interface RequestStore
     public function hasPriorRequest(?string $emailHash, ?string $nameHash): bool;
     public function deleteExpiredPending(\DateTimeImmutable $now, int $ttlHours): int;
     public function anonymizeOlderThan(\DateTimeImmutable $cutoff): int;
+    /** @return array<int,array<string,mixed>> every requests row as an associative array (for export) */
+    public function allRows(): array;
+    /** Delete every row (DML, transaction-safe). @return int rows removed */
+    public function deleteAll(): int;
+    /** Insert rows from a bundle, whitelisting columns. @param array<int,array<string,mixed>> $rows @return int inserted */
+    public function insertRows(array $rows): int;
 }
