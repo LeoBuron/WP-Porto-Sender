@@ -39,6 +39,9 @@ final class Settings
             'rate_limit_enabled' => true,
             'rate_limit_per_ip_day' => 3,
             'rate_limit_global_hour' => 20,
+            'admin_notify_enabled' => true,
+            'admin_notify_include_pii' => false,
+            'admin_notify_window_minutes' => 15,
             'pii_retention_days' => 180,
             'captcha_provider' => 'altcha',
             'altcha_hmac_secret' => '',
@@ -63,6 +66,9 @@ final class Settings
     public function rateLimitEnabled(): bool { return (bool) $this->values['rate_limit_enabled']; }
     public function rateLimitPerIpDay(): int { return (int) $this->values['rate_limit_per_ip_day']; }
     public function rateLimitGlobalHour(): int { return (int) $this->values['rate_limit_global_hour']; }
+    public function adminNotifyEnabled(): bool { return (bool) $this->values['admin_notify_enabled']; }
+    public function adminNotifyIncludePii(): bool { return (bool) $this->values['admin_notify_include_pii']; }
+    public function adminNotifyWindowMinutes(): int { return (int) $this->values['admin_notify_window_minutes']; }
     public function piiRetentionDays(): int { return (int) $this->values['pii_retention_days']; }
     public function captchaProvider(): string { return (string) $this->values['captcha_provider']; }
     public function altchaHmacSecret(): string { return (string) $this->values['altcha_hmac_secret']; }
@@ -97,6 +103,10 @@ final class Settings
         $result['rate_limit_enabled'] = !empty($input['rate_limit_enabled']);
         $result['rate_limit_per_ip_day'] = absint($input['rate_limit_per_ip_day'] ?? $result['rate_limit_per_ip_day']);
         $result['rate_limit_global_hour'] = absint($input['rate_limit_global_hour'] ?? $result['rate_limit_global_hour']);
+        // Admin notifications (form-rendered; absent checkbox means "off").
+        $result['admin_notify_enabled'] = !empty($input['admin_notify_enabled']);
+        $result['admin_notify_include_pii'] = !empty($input['admin_notify_include_pii']);
+        $result['admin_notify_window_minutes'] = absint($input['admin_notify_window_minutes'] ?? $result['admin_notify_window_minutes']);
 
         return $result;
     }

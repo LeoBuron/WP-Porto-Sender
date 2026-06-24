@@ -42,4 +42,29 @@ final class Mailer implements MailerInterface
         $body = sprintf(__('Es sind keine Codes für "%s" mehr verfügbar.', 'wp-porto-sender'), $productLabel);
         return (bool) wp_mail($to, $subject, $body);
     }
+
+    /**
+     * Notify the admin that visitor(s) claimed a porto code. PII-free by default;
+     * name/email are appended only when the caller supplies them (opt-in setting).
+     *
+     * @param array{product_label:string,count:int,remaining:int,name:?string,email:?string} $data
+     */
+    public function sendAdminNotification(string $to, array $data): bool
+    {
+        $subject = __('WP-Porto-Sender: Porto abgerufen', 'wp-porto-sender');
+        $body = sprintf(
+            __("Es wurden Porto-Codes abgerufen.\n\nProdukt: %1\$s\nAnzahl seit der letzten Benachrichtigung: %2\$d\nVerbleibender Vorrat: %3\$d", 'wp-porto-sender'),
+            (string) $data['product_label'],
+            (int) $data['count'],
+            (int) $data['remaining']
+        );
+
+        $name = $data['name'] ?? null;
+        $email = $data['email'] ?? null;
+        if ($name !== null && $name !== '' && $email !== null && $email !== '') {
+            $body .= sprintf(__("\n\nAnfrage von: %s <%s>", 'wp-porto-sender'), $name, $email);
+        }
+
+        return (bool) wp_mail($to, $subject, $body);
+    }
 }

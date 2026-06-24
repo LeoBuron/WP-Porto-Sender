@@ -121,6 +121,14 @@ explicit user action) are implemented **disabled-by-default behind a setting** a
   satisfies the requirement; separate `each`/`daily_digest` modes are flexibility not yet needed (window=0
   already gives per-event). Issue events are already downstream of captcha+rate-limit, so volume is
   doubly-dampened. — reversible.
+- **D24.1 [WS1] — Throttle is a rolling cooldown, not a clock-aligned bucket (impl, 2026-06-25)** →
+  AdminNotifier uses a leading-edge send + a cooldown transient (TTL = window) + a carried-over `pending`
+  counter, behind a `NotifyThrottleStore` seam. The first event after a cooldown sends `pending+1` (so a
+  burst collapses to one mail that still reports its true size); `window=0` sends every event. — A rolling
+  cooldown guarantees ≥window between mails (a clock bucket can fire twice across a boundary), and the
+  transient TTL removes the need for a Clock dependency. State keys: option `porto_notify_pending`
+  (autoload=false) + transient `porto_notify_cooldown`. **Task 14/uninstall MUST purge both** (the option
+  is not under the `porto_sender_` prefix). — reversible.
 - **D25 [WS1] — Wiring** → New `src/Notifications/AdminNotifier.php` (thin, unit-testable policy:
   enabled? throttled? build + send via Mailer), injected into `IssuanceService` and called on the
   issue-success path. — Constructor injection matches house style (IssuanceService already takes Mailer

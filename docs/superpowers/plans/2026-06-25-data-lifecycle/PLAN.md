@@ -379,16 +379,15 @@ nonce+cap-gated. ✅ (browser-UX smoke folded into WS2 end-to-end)
   `adminNotifyIncludePii(): bool`, `adminNotifyWindowMinutes(): int`. `sanitize()` casts the two
   checkboxes (absent = false) and `absint`s the window; never clobbers non-form keys.
 
-- [ ] Step 1: Unit test — defaults present; accessors return defaults + overrides; `sanitize()` casts
-  checkboxes + clamps window ≥ 0; existing keys (e.g. `hash_salt`) preserved.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement.
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test (`AdminNotifySettingsTest`) — defaults (true/false/15); overrides; `sanitize()`
+  casts both checkboxes (absent=false) + `absint` window; preserves `hash_salt`.
+- [x] Step 2: RED (accessors missing). 3: Added 3 defaults + 3 accessors + sanitize block. 4: GREEN.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter AdminNotifySettings`
-**DoD:** three keys with defaults/accessors/sanitize, non-form keys preserved.
+**DoD:** three keys with defaults/accessors/sanitize, non-form keys preserved. ✅
 **Evidence:**
 ```
+# RED -> 2 errors/1 failure; GREEN -> OK (4 tests, 13 assertions). hash_salt preserved through sanitize.
 ```
 
 ### Task 11: `Mailer::sendAdminNotification`
@@ -400,16 +399,15 @@ nonce+cap-gated. ✅ (browser-UX smoke folded into WS2 end-to-end)
   `['product_label'=>string,'count'=>int,'remaining'=>int,'name'=>?string,'email'=>?string]`.
   German subject/body; includes name/email only when present; text mail; uses `wp_mail`; returns its bool.
 
-- [ ] Step 1: Unit test (brain/monkey `wp_mail` spy) — composes subject/body, includes count+remaining,
-  includes name/email only when provided, returns the `wp_mail` result.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement.
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test (`wp_mail` spy) — PII-free body (count+remaining+product, no "Anfrage von"); PII
+  body adds `Anfrage von: Vera <vera@example.de>`; returns `wp_mail` result.
+- [x] Step 2: RED. 3: Added `sendAdminNotification` to MailerInterface + Mailer. 4: GREEN.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter AdminNotificationMail`
-**DoD:** new sender mirrors the existing four; PII conditional; `wp_mail`-backed.
+**DoD:** new sender mirrors the existing four; PII conditional; `wp_mail`-backed. ✅
 **Evidence:**
 ```
+# RED -> 3 errors; GREEN -> OK (3 tests, 11 assertions). German subject "Porto abgerufen"; PII opt-in only.
 ```
 
 ### Task 12: `AdminNotifier` — policy + window throttle
@@ -426,17 +424,22 @@ nonce+cap-gated. ✅ (browser-UX smoke folded into WS2 end-to-end)
   subsequent events in the window only increment the pending count; `window=0` → send every event. PII
   passed to Mailer only when `adminNotifyIncludePii()`.
 
-- [ ] Step 1: Unit test (fake clock + fake counter store + spy Mailer) — enabled=false → never sends;
-  single event in empty window → one send; two events in window → one send, count=2; window=0 → every
-  event sends; include_pii toggles name/email passed to Mailer.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement (reuse the `RateCounterStore` seam or a minimal option-backed counter).
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1: Unit test (fake `NotifyThrottleStore` + Mockery mailer) — disabled→never; no recipient→never;
+  single event→one send (count=1) + cooldown armed 900s; burst→one send + pending accumulates; window=0→every
+  event; include_pii toggles name/email.
+- [x] Step 2: RED (interface missing). 3: `NotifyThrottleStore` (seam) + `WpNotifyThrottleStore`
+  (option+transient) + `AdminNotifier`. 4: GREEN.
+
+**Design note (D24 refinement):** rolling-cooldown + carry-over `pending` (not a clock-aligned time bucket):
+leading edge sends, cooldown transient TTL = window, events during cooldown accumulate, first event after
+cooldown sends `pending+1`. Guarantees ≥window between mails. No Clock dependency (transient TTL handles timing).
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter AdminNotifier`
-**DoD:** throttle coalesces a burst into one mail per window; toggle + PII honoured.
+**DoD:** throttle coalesces a burst into one mail per window; toggle + PII honoured. ✅
 **Evidence:**
 ```
+# RED -> fatal (interface missing); GREEN -> OK (6 tests, 14 assertions)
+# full unit suite after Tasks 10-12: composer test:unit -> OK (104 tests, 293 assertions)
 ```
 
 ### Task 13: Wire `AdminNotifier` into issuance + SettingsPage fieldset

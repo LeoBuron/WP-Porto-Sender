@@ -2,6 +2,12 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 6 — WS1 Tasks 10–12 DONE.** (10) Settings `admin_notify_*` keys; (11)
+  `Mailer::sendAdminNotification` (PII-free by default, German); (12) `AdminNotifier` rolling-cooldown
+  throttle behind `NotifyThrottleStore` seam (+ `WpNotifyThrottleStore`). Unit 91→104, all green.
+  **Next:** Task 13 (wire AdminNotifier into `IssuanceService::confirm` success + SettingsPage fieldset +
+  integration test), then WS1 SECURITY REVIEW → WS1 done. NB: Task 14 DataEraser must purge
+  `porto_notify_pending` (option) + `porto_notify_cooldown` (transient) — see D24.1.
 - **2026-06-25 · PHASE B iter 5 — WS2 DONE.** Security review (adversarial subagent over the 17-file diff):
   0 crit/high/med, 5 low. Fixed the top low (full_restore now whitelists imported settings keys —
   `ImportService::sanitizeImportedSettings`, +1 unit test); deferred 4 lows w/ justifications in SECURITY.md.
@@ -37,7 +43,7 @@
 
 ## Workstream status
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
-- WS1 (admin notification): not started — Tasks 10–13 + SEC.
+- WS1 (admin notification): **in progress** — Tasks 10–12 ✅; Task 13 (wiring) + SEC pending.
 - WS4 (uninstall & lifecycle): not started — Tasks 14–16 + SEC.
 - WS3 (geo, default-off): not started — Tasks 17–20 + SEC.
 - FINAL stop-condition: pending.
