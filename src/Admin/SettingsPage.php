@@ -66,9 +66,17 @@ final class SettingsPage
             'altcha_hmac_secret' => [__('Altcha HMAC-Secret', 'wp-porto-sender'), 'text', $s->altchaHmacSecret()],
             'privacy_policy_url' => [__('Datenschutz-URL', 'wp-porto-sender'), 'url', $s->privacyPolicyUrl()],
         ];
+        $descriptions = [
+            'pii_retention_days' => __('Name und E-Mail ausgegebener Portos werden nach so vielen Tagen anonymisiert (der Datensatz und die Hashes bleiben für die Missbrauchsprüfung erhalten).', 'wp-porto-sender'),
+            'unconfirmed_retention_days' => __('Nie bestätigte Anfragen werden so viele Tage aufbewahrt (für die Betrugs-/Missbrauchsprüfung) und danach gelöscht. Unabhängig von der Token-Gültigkeit — abgelaufene Links funktionieren weiterhin nicht.', 'wp-porto-sender'),
+        ];
         foreach ($fields as $key => [$label, $type, $value]) {
-            printf('<p><label>%s<br><input type="%s" name="%s[%s]" value="%s"></label></p>',
+            printf('<p><label>%s<br><input type="%s" name="%s[%s]" value="%s"></label>',
                 esc_html($label), esc_attr($type), esc_attr($opt), esc_attr($key), esc_attr((string) $value));
+            if (isset($descriptions[$key])) {
+                printf('<br><span class="description">%s</span>', esc_html($descriptions[$key]));
+            }
+            echo '</p>';
         }
         // Rate limiting
         echo '<fieldset><legend>' . esc_html__('Rate-Limiting (Missbrauchsschutz)', 'wp-porto-sender') . '</legend>';
