@@ -79,8 +79,9 @@ sanitize casts + `absint`), throttle key integrity (constant option/transient na
   test `test_notifier_failure_does_not_break_issuance` (throwing mailer → still `issued`). Suites green.
 - [low] uninstall.php — `porto_notify_pending` (option) + `porto_notify_cooldown` (transient) are not yet
   purged on uninstall — orphaned residue after removal (tiny, bounded; transient self-expires) — add to the
-  WS4 DataEraser/uninstall — **status(deferred)**: already tracked in DECISIONS D24.1; WS4 Task 14 will purge
-  both (verified there).
+  WS4 DataEraser/uninstall — **status(fixed in WS4 Task 14)**: `DataEraser::purgeAll` deletes
+  `porto_notify_pending` (option) + `porto_notify_cooldown` (transient); proven by `DataEraserTest` and the
+  real-`uninstall.php` `UninstallCompletenessTest`.
 ### WS4 — (pending)
 ### WS3 — (pending)
 ### FINAL whole-branch — (pending)

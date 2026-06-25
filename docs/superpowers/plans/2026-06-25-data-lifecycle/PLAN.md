@@ -504,14 +504,24 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
 - [ ] Step 1: Integration test — seed both tables, the settings + schema-version options, a
   `porto_sender_lowstock_x` option, a `porto_rl_*` and a `porto_notify_*` transient, and the cron event;
   call `purgeAll`; assert all gone (tables, options by-name + by-prefix, transients, cron unscheduled).
-- [ ] Step 2: Run → FAIL.
-- [ ] Step 3: Implement.
-- [ ] Step 4: Run → PASS. Commit.
+- [x] Step 1–4: Integration test (`DataEraserTest`) seeds a code row, settings + schema-version +
+  lowstock + notify-pending options, a `porto_rl_*` + notify-cooldown transient, the cron event → `purgeAll`
+  → all 7 gone. Implemented `src/Lifecycle/DataEraser.php`. **Two harness fixes:** (a) the test removes WP's
+  `_drop_temporary_tables` filter so the real DROP executes (WP_UnitTestCase rewrites DROP→DROP TEMPORARY)
+  and reinstalls tables in tearDown; (b) `purgeAll` ends with `wp_cache_flush()` because the raw LIKE
+  deletes bypass WP's option cache (else `get_option` returns a stale value — real cache-coherence fix, not
+  just a test artifact). `delete_transient` for fixed-key transients (object-cache-safe), `DELETE LIKE`
+  (esc_like'd) only for the unenumerable `porto_rl_*`. Uses `Maintenance::HOOK`. **Resolves the WS1 low**
+  (purges `porto_notify_pending` + `porto_notify_cooldown`).
+- (no `purgeDataTablesOnly` — ImportService clears via `deleteAll`, D15.1.)
 
 **Verify:** `npm run test:integration` (filter DataEraser).
-**DoD:** one call removes every `porto_*` table/option/transient/cron; reusable by uninstall + button.
+**DoD:** one call removes every `porto_*` table/option/transient/cron; reusable by uninstall + button. ✅
 **Evidence:**
 ```
+# debugging: table-drop neutered by _drop_temporary_tables filter; lowstock stale via option cache.
+# fixes: remove filter (real DROP) + wp_cache_flush(). GREEN -> OK (1 test, 9 assertions)
+# full integration suite (isolation held with table drop/reinstall): OK (38 tests)
 ```
 
 ### Task 15: `uninstall.php` → `DataEraser`
@@ -520,17 +530,18 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
 
 **Interfaces:** Consumes `DataEraser::purgeAll`.
 
-- [ ] Step 1: Integration test — simulate uninstall (define `WP_UNINSTALL_PLUGIN`, seed data, invoke
-  `DataEraser::purgeAll($wpdb)` as `uninstall.php` does) → no `porto_*` option/transient/table remains,
-  cron unscheduled.
-- [ ] Step 2: Run → FAIL (today's uninstall leaks transients/cron).
-- [ ] Step 3: Replace the body of `uninstall.php` with the guard + autoload + `DataEraser::purgeAll($wpdb)`.
-- [ ] Step 4: Run → PASS. Commit.
+- [x] Step 1–4: `UninstallCompletenessTest` `require`s the REAL `uninstall.php` (WP_UNINSTALL_PLUGIN defined)
+  after seeding settings + `porto_notify_pending` (missed by the old uninstall) + a `porto_rl_*` transient +
+  cron → asserts all gone incl. table dropped. Replaced `uninstall.php` body with
+  `DataEraser::purgeAll($wpdb)`.
 
-**Verify:** integration filter.
-**DoD:** uninstall leaves zero plugin residue, including transients + cron.
+**Verify:** `npm run test:integration -- --filter UninstallCompleteness`
+**DoD:** uninstall leaves zero plugin residue, including transients + cron. ✅
 **Evidence:**
 ```
+# GREEN -> OK (1 test, 5 assertions): real uninstall.php purges settings, notify_pending, rate-limit
+#   transient, cron, and the tables. (old uninstall.php would leak notify_pending + cron.)
+# full integration suite: OK (39 tests, 131 assertions)
 ```
 
 ### Task 16: ToolsPage data-lifecycle (reset / delete-all) + pre-removal link

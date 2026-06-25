@@ -4,6 +4,6 @@ if (!defined('WP_UNINSTALL_PLUGIN')) { exit; }
 require_once __DIR__ . '/vendor/autoload.php';
 
 global $wpdb;
-\PortoSender\Persistence\Schema::uninstall($wpdb);
-delete_option(\PortoSender\Settings\Settings::OPTION);
-foreach (['standardbrief', 'grossbrief'] as $p) { delete_option('porto_sender_lowstock_' . $p); }
+// Single source of truth for "all plugin data" — shared with the admin "delete all
+// data" action so the two paths can never drift (tables, options, transients, cron).
+\PortoSender\Lifecycle\DataEraser::purgeAll($wpdb);

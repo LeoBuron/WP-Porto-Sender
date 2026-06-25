@@ -2,6 +2,12 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 8 — WS4 Tasks 14–15 DONE.** (14) `DataEraser::purgeAll` — single purge def
+  (tables/options/transients/cron incl. the WS1 notify keys, resolving that deferred low); (15) `uninstall.php`
+  now delegates to it (real-file integration test proves zero residue). Two harness fixes: drop WP's
+  `_drop_temporary_tables` filter so the real DROP runs; `wp_cache_flush()` after raw LIKE deletes (cache
+  coherence). Integration 37→39, all green; unit 104.
+  **Next:** Task 16 (ToolsPage reset / delete-all buttons + `plugin_action_links`), then WS4 SEC + live smoke → WS4 done.
 - **2026-06-25 · PHASE B iter 7 — WS1 DONE.** Task 13 wired AdminNotifier into `IssuanceService::confirm`
   (nullable observer) + SettingsPage fieldset + integration test (real-WP `pre_wp_mail` capture). WS1 security
   review: 0 crit/high, 1 med (uncaught `onIssued` exception reaching the visitor → **fixed** with try/catch +
@@ -49,7 +55,7 @@
 ## Workstream status
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
 - WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
-- WS4 (uninstall & lifecycle): not started — Tasks 14–16 + SEC.
+- WS4 (uninstall & lifecycle): **in progress** — Tasks 14–15 ✅; Task 16 (reset/delete-all UI) + SEC pending.
 - WS3 (geo, default-off): not started — Tasks 17–20 + SEC.
 - FINAL stop-condition: pending.
 
