@@ -31,8 +31,16 @@ jobs:
     # Heavy (boots Docker WordPress + MySQL) — run on PRs and main pushes, not every branch push.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Check out into a lowercase dir so wp-env mounts the plugin at
+    # wp-content/plugins/wp-porto-sender — the path the npm script's --env-cwd expects.
+    # (Locally this matches only because macOS is case-insensitive; Linux CI is not.)
+    defaults:
+      run:
+        working-directory: wp-porto-sender
     steps:
       - uses: actions/checkout@v5
+        with:
+          path: wp-porto-sender
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
