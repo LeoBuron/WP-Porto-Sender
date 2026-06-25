@@ -70,6 +70,23 @@ final class ToolsPageExportImportTest extends PortoTestCase
         $this->assertNotNull($requests->findByTokenHash('tok-tools'));
     }
 
+    public function test_export_payload_bundle_with_passphrase_is_labeled_and_actually_encrypted(): void
+    {
+        global $wpdb;
+        $codes = new CodeRepository($wpdb);
+        $requests = new RequestRepository($wpdb);
+        $this->seed($codes, $requests);
+
+        $payload = (new ToolsPage($codes, $requests))->exportPayload('bundle', 'secret-pw');
+
+        // Label and body cannot diverge: .enc + octet-stream AND the body really is ciphertext.
+        $this->assertStringEndsWith('.json.enc', $payload['filename']);
+        $this->assertStringContainsString('application/octet-stream', $payload['contentType']);
+        $this->assertStringStartsWith('PORTOENC1', $payload['body']);
+        $json = (new \PortoSender\Portability\BundleCrypto())->decrypt($payload['body'], 'secret-pw');
+        $this->assertStringContainsString('TOOLS1', $json); // labeling is honest — it decrypts
+    }
+
     public function test_code_intake_csv_file_import(): void
     {
         global $wpdb;

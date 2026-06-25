@@ -10,7 +10,6 @@ use PortoSender\Persistence\Schema;
 use PortoSender\Persistence\SchemaVersion;
 use PortoSender\Portability\ExportService;
 use PortoSender\Portability\ImportService;
-use PortoSender\Portability\BundleCrypto;
 use PortoSender\Lifecycle\DataEraser;
 use PortoSender\Cron\Maintenance;
 
@@ -139,7 +138,12 @@ final class ToolsPage
             );
         }
 
-        $payload = $this->exportPayload($format, $passphrase !== '' ? $passphrase : null);
+        try {
+            $payload = $this->exportPayload($format, $passphrase !== '' ? $passphrase : null);
+        } catch (\RuntimeException $e) {
+            // e.g. passphrase set but ext-sodium unavailable -> clean error, never a plaintext leak.
+            wp_die(esc_html($e->getMessage()), '', ['response' => 500]);
+        }
         $this->stream($payload['filename'], $payload['contentType'], $payload['body']);
     }
 
@@ -239,7 +243,10 @@ final class ToolsPage
      */
     private function bundlePayload(ExportService $export, ?string $passphrase, string $date): array
     {
-        $encrypted = $passphrase !== null && $passphrase !== '' && BundleCrypto::available();
+        // ExportService::bundle() is the single authority on whether encryption happened:
+        // it encrypts IFF a passphrase is set, and throws (never degrades to plaintext) if it
+        // cannot. So the .enc label derives solely from "passphrase given" — the two can't diverge.
+        $encrypted = $passphrase !== null && $passphrase !== '';
         return [
             'filename' => $encrypted ? "porto-bundle-$date.json.enc" : "porto-bundle-$date.json",
             'contentType' => $encrypted ? 'application/octet-stream' : 'application/json; charset=utf-8',

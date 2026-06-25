@@ -42,10 +42,13 @@ final class ExportService
     }
 
     /**
-     * Build the lossless bundle. When a non-empty passphrase is given and
-     * ext-sodium is available, the bundle is encrypted; otherwise it is the raw
-     * (secret-bearing) JSON, which the caller only emits behind an explicit
-     * confirmation.
+     * Build the lossless bundle. With a non-empty passphrase the bundle is
+     * encrypted; with no passphrase it is the raw (secret-bearing) JSON, which the
+     * caller only emits behind an explicit confirmation.
+     *
+     * Encryption never silently degrades to plaintext: if a passphrase is given but
+     * ext-sodium is unavailable, this throws rather than write the secret salt + PII
+     * unencrypted. So the result is encrypted IFF a passphrase was supplied.
      */
     public function bundle(?string $passphrase): string
     {
@@ -58,7 +61,13 @@ final class ExportService
             $this->exportedAt
         );
 
-        if ($passphrase !== null && $passphrase !== '' && BundleCrypto::available()) {
+        if ($passphrase !== null && $passphrase !== '') {
+            if (!BundleCrypto::available()) {
+                throw new \RuntimeException(
+                    'A passphrase was set but ext-sodium is unavailable on this server; '
+                    . 'refusing to export the secret-bearing bundle unencrypted.'
+                );
+            }
             return $this->crypto->encrypt($json, $passphrase);
         }
         return $json;
