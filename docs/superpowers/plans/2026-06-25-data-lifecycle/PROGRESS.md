@@ -2,6 +2,12 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 11 — WS3 Tasks 17–19 DONE.** (17) Geo Settings keys (all default OFF/safe);
+  (18) GeoProvider interface + Null/Cloudflare/MaxMind/Api providers + factory (ships no MaxMind lib/data,
+  Api off without url — HARD-STOPs honoured; factory fails safe to Null); (19) pure `GeoGate` policy
+  (fail-open default, catches provider exceptions, never throws). Unit 104→127, all green.
+  **Next:** Task 20 (wire GeoGate into `IssuanceService` after captcha/before rate-limit + REST 403 +
+  porto-form.js message + SettingsPage geo fieldset + integration), then WS3 SEC → WS3 done → STOP CONDITION.
 - **2026-06-25 · PHASE B iter 10 — WS4 DONE.** WS4 security review: **0 crit/high/med/low** (destructive
   actions correctly cap+nonce+confirm-gated, no CSRF, esc_like'd LIKE, salt-safe; clarified the global
   `wp_cache_flush`). WS4 live DR smoke passed on the real DB (export → `deleteAllData` DROP+recreate+new salt
@@ -67,7 +73,7 @@
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
 - WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
 - WS4 (uninstall & lifecycle): **DONE** ✅ — Tasks 14–16 + security review (0 findings) + live DR smoke.
-- WS3 (geo, default-off): not started — Tasks 17–20 + SEC.
+- WS3 (geo, default-off): **in progress** — Tasks 17–19 ✅; Task 20 (wiring) + SEC pending.
 - FINAL stop-condition: pending.
 
 ## Open sign-off items (shipped disabled; do not enable unattended)

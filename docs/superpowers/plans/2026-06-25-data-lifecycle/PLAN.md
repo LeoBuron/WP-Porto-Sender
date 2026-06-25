@@ -614,16 +614,15 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
   provider ∈ allow-list else retained; countries = uppercased 2-letter codes; fail-mode ∈ {open,closed};
   checkboxes cast; api_key `sanitize_text_field`; never clobber non-form keys.
 
-- [ ] Step 1: Unit test — defaults + accessors + sanitize (country list parsing, provider/fail-mode
-  whitelisting, checkbox casts, non-form keys preserved).
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement.
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1–4: Unit test (`GeoSettingsTest`) — defaults all OFF/safe (enabled=false, provider=cloudflare,
+  countries=['DE'], fail-open); sanitize whitelists provider/fail-mode, parses "de, at,xxx" → ['DE','AT'],
+  empty-list → ['DE'], casts checkboxes, preserves hash_salt. Implemented 8 keys + accessors + sanitize. RED→GREEN.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter GeoSettings`
-**DoD:** geo keys default OFF; accessors + sanitize correct.
+**DoD:** geo keys default OFF; accessors + sanitize correct. ✅
 **Evidence:**
 ```
+# RED -> 2 errors/3 failures; GREEN -> OK (5 tests, 23 assertions). geo_enabled default false (no IP processing).
 ```
 
 ### Task 18: `GeoProvider` interface + providers + factory
@@ -639,17 +638,18 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
   parses a 2-letter code; null on network error/bad body. `GeoProviderFactory::make(Settings): GeoProvider`
   → returns `NullGeoProvider` when geo disabled, the provider unavailable, or (Cloudflare) the ack is off.
 
-- [ ] Step 1: Unit tests — Cloudflare reads the header (set/absent/`XX`); Null always null; MaxMind
-  unavailable → null; Api parses a faked `wp_remote_get` body and maps a `WP_Error`/non-200 to null;
-  factory returns Null when disabled/unacked/unavailable, else the chosen provider.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement (ship **no** MaxMind lib/data; Api off without url+key).
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1–4: Unit tests (`GeoProvidersTest`) — Cloudflare header set/absent/XX/T1; Null always null;
+  MaxMind unavailable (no lib/db) → null; Api parses faked body, maps WP_Error/non-200/empty-url → null;
+  factory → Null when disabled/unacked-cloudflare/unavailable-maxmind/no-api-url, else the chosen provider.
+  Implemented interface + 4 providers + factory — **ships no MaxMind lib/data** (class_exists+is_readable
+  guard); **Api off without url** (HARD-STOPs honoured). RED→GREEN.
 
-**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter Geo`
-**DoD:** provider-agnostic; sign-off providers inert without their prerequisites; factory fails safe to Null.
+**Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter GeoProviders`
+**DoD:** provider-agnostic; sign-off providers inert without their prerequisites; factory fails safe to Null. ✅
 **Evidence:**
 ```
+# RED -> 11 errors (classes missing); GREEN -> OK (11 tests, 20 assertions).
+# Factory fail-safe: enabled-but-unconfigured -> NullGeoProvider -> country()=null -> fail-open allow-all.
 ```
 
 ### Task 19: `GeoGate` — policy
@@ -662,16 +662,15 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
   `!geoEnabled()` → true; else `c = p.country(ip)` (provider exceptions caught → treated as null);
   `c === null` → `geoFailOpen()`; `c ∈ geoAllowedCountries()` → true else false. Pure; never throws.
 
-- [ ] Step 1: Unit test — disabled → allow; DE → allow; FR → deny; null+open → allow; null+closed → deny;
-  provider throws → caught → fail-mode applied; allowed `['DE','AT']` honoured.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement.
-- [ ] Step 4: Run unit → PASS. Commit.
+- [x] Step 1–4: Unit test (`GeoGateTest`, fake provider) — disabled→allow; DE→allow; FR→deny; null+open→allow;
+  null+closed→deny; provider throws→caught→fail-mode; ['DE','AT']→AT allowed. Implemented pure `GeoGate`. RED→GREEN.
 
 **Verify:** `vendor/bin/phpunit -c phpunit-unit.xml --filter GeoGate`
-**DoD:** pure boolean policy; fail-mode correct; cannot throw.
+**DoD:** pure boolean policy; fail-mode correct; cannot throw. ✅
 **Evidence:**
 ```
+# RED -> 7 errors; GREEN -> OK (7 tests, 8 assertions). Catches provider exceptions -> fail-mode (never throws).
+# full unit suite after Tasks 17-19: composer test:unit -> OK (127 tests, 344 assertions)
 ```
 
 ### Task 20: Wire `GeoGate` into issuance + REST 403 + UI

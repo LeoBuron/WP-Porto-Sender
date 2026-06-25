@@ -42,6 +42,14 @@ final class Settings
             'admin_notify_enabled' => true,
             'admin_notify_include_pii' => false,
             'admin_notify_window_minutes' => 15,
+            'geo_enabled' => false,
+            'geo_provider' => 'cloudflare',
+            'geo_allowed_countries' => ['DE'],
+            'geo_fail_mode' => 'open',
+            'geo_cloudflare_ack' => false,
+            'geo_maxmind_db_path' => '',
+            'geo_api_url' => '',
+            'geo_api_key' => '',
             'pii_retention_days' => 180,
             'captcha_provider' => 'altcha',
             'altcha_hmac_secret' => '',
@@ -69,6 +77,15 @@ final class Settings
     public function adminNotifyEnabled(): bool { return (bool) $this->values['admin_notify_enabled']; }
     public function adminNotifyIncludePii(): bool { return (bool) $this->values['admin_notify_include_pii']; }
     public function adminNotifyWindowMinutes(): int { return (int) $this->values['admin_notify_window_minutes']; }
+    public function geoEnabled(): bool { return (bool) $this->values['geo_enabled']; }
+    public function geoProvider(): string { return (string) $this->values['geo_provider']; }
+    /** @return array<int,string> ISO-3166-1 alpha-2 codes */
+    public function geoAllowedCountries(): array { return array_values((array) $this->values['geo_allowed_countries']); }
+    public function geoFailOpen(): bool { return ($this->values['geo_fail_mode'] ?? 'open') !== 'closed'; }
+    public function geoCloudflareAck(): bool { return (bool) $this->values['geo_cloudflare_ack']; }
+    public function geoMaxmindDbPath(): string { return (string) $this->values['geo_maxmind_db_path']; }
+    public function geoApiUrl(): string { return (string) $this->values['geo_api_url']; }
+    public function geoApiKey(): string { return (string) $this->values['geo_api_key']; }
     public function piiRetentionDays(): int { return (int) $this->values['pii_retention_days']; }
     public function captchaProvider(): string { return (string) $this->values['captcha_provider']; }
     public function altchaHmacSecret(): string { return (string) $this->values['altcha_hmac_secret']; }
@@ -107,6 +124,24 @@ final class Settings
         $result['admin_notify_enabled'] = !empty($input['admin_notify_enabled']);
         $result['admin_notify_include_pii'] = !empty($input['admin_notify_include_pii']);
         $result['admin_notify_window_minutes'] = absint($input['admin_notify_window_minutes'] ?? $result['admin_notify_window_minutes']);
+        // Geo restriction (WS3) — default OFF; external sources are sign-off-gated.
+        $providers = ['none', 'cloudflare', 'maxmind', 'api'];
+        $result['geo_enabled'] = !empty($input['geo_enabled']);
+        $result['geo_provider'] = in_array($input['geo_provider'] ?? '', $providers, true)
+            ? $input['geo_provider'] : $result['geo_provider'];
+        $rawCountries = $input['geo_allowed_countries'] ?? '';
+        if (is_array($rawCountries)) { $rawCountries = implode(',', $rawCountries); }
+        $countries = array_values(array_filter(
+            array_map(static fn ($c): string => strtoupper(trim((string) $c)), explode(',', (string) $rawCountries)),
+            static fn (string $c): bool => preg_match('/^[A-Z]{2}$/', $c) === 1
+        ));
+        $result['geo_allowed_countries'] = $countries !== [] ? $countries : ['DE'];
+        $result['geo_fail_mode'] = in_array($input['geo_fail_mode'] ?? '', ['open', 'closed'], true)
+            ? $input['geo_fail_mode'] : $result['geo_fail_mode'];
+        $result['geo_cloudflare_ack'] = !empty($input['geo_cloudflare_ack']);
+        $result['geo_maxmind_db_path'] = sanitize_text_field($input['geo_maxmind_db_path'] ?? $result['geo_maxmind_db_path']);
+        $result['geo_api_url'] = esc_url_raw($input['geo_api_url'] ?? $result['geo_api_url']);
+        $result['geo_api_key'] = sanitize_text_field($input['geo_api_key'] ?? $result['geo_api_key']);
 
         return $result;
     }
