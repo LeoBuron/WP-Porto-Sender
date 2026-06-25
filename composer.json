@@ -2,6 +2,7 @@
   "name": "leoburon/wp-porto-sender",
   "description": "Email visitors a single-use Deutsche Post Mobile Briefmarke code from a pre-purchased pool.",
   "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
   "require": { "php": ">=8.1",
     "altcha-org/altcha": "^2.0" },
   "require-dev": {
