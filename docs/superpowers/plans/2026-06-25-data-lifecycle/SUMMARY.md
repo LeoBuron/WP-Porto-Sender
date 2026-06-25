@@ -14,8 +14,8 @@
 
 ## Verification (evidence in PLAN.md per task)
 
-- **Unit:** `composer test:unit` → **OK (129 tests, 351 assertions)** (was 48 at branch start).
-- **Integration (wp-env):** `npm run test:integration` → **OK (43 tests, 143 assertions)** (was 23).
+- **Unit:** `composer test:unit` → **OK (135 tests, 373 assertions)** (was 48 at branch start).
+- **Integration (wp-env):** `npm run test:integration` → **OK (48 tests, 162 assertions)** (was 23).
 - **Live end-to-end smokes (real wp-env runtime, `wp eval-file`):**
   - WS2: export → wipe + change salt → full-restore restored real data **and the source salt** (DR round-trip).
   - WS1: confirm→issue fired exactly one admin mail ("Porto abgerufen"), PII-free.
@@ -42,10 +42,28 @@ These are the HARD-STOP items; the gate/flow is built + tested, the source stays
 4. **WS2 unencrypted bundle** — contains the secret salt + PII; allowed only behind an explicit
    confirmation. Prefer the passphrase-encrypted bundle.
 
+## Post-handoff hardening pass (after the stop-condition)
+
+A 6-dimension multi-agent review (correctness / edge / test-gaps / quality / WordPress / data-DSGVO), every
+finding adversarially verified, surfaced 8 real robustness issues beyond the security gate — all fixed via TDD
+(unit 129→135, integration 43→48). Highlights:
+- **Data-safety:** `full_restore` now type-validates the bundle *before* wiping tables — a corrupt/truncated
+  bundle can no longer wipe-then-crash (it aborts with data intact).
+- **DSGVO:** "delete all data & re-initialise" now re-arms the daily maintenance cron, so PII anonymization
+  keeps running on the fresh install.
+- **Secret safety:** a passphrase on a host without ext-sodium now *refuses* to export rather than silently
+  writing the salt + PII as plaintext; the `.enc` label can no longer disagree with the body.
+- **Throttle:** admin-notify commits its cooldown only *after* a successful send; the carry-over branch is now
+  tested. Plus: merge skip-warnings, schema-version bound, a guarded `created_at` parse, geo fail-closed→403
+  coverage, and PII-table-drop assertions. See PROGRESS.md for the per-finding log.
+
 ## Deferred (logged, non-blocking)
 
-- WS2 `data_merge` import with colliding source ids silently skips (warned best-effort path; full-restore
-  is the supported lossless path) — see SECURITY.md WS2.
+- WS2 `data_merge` into a non-empty install drops id/code/token-colliding rows (full_restore is the lossless
+  path). Now **surfaced**: the merge result carries a skipped-row warning so the admin is not misled.
+- Merge/salt warning strings are returned in English from the domain layer (`ImportService`) rather than via
+  translatable codes — consistent with the existing pattern; a future i18n refactor can return warning codes
+  and translate in `ToolsPage`.
 
 ## How to integrate
 

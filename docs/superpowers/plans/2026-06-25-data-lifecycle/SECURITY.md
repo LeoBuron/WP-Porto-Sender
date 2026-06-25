@@ -134,3 +134,22 @@ security gate.** Holistic cross-workstream pass over `main..feat/data-lifecycle`
   escaped + cap-gated; no secret rendered-unescaped/logged.
 
 The four prior per-workstream fixes are all present and correct in the final tree. No files modified by the review.
+
+### POST-HANDOFF hardening pass — 2026-06-25 (6-dimension correctness/quality/test-gap review, all findings adversarially verified)
+
+A multi-agent review (correctness, edge-cases, test-gaps, quality, WordPress-semantics, data/DSGVO) over the
+whole branch produced 18 verified findings → 8 distinct issues. These are correctness/robustness, NOT new
+crit/high security holes (the security gate above still holds). One is security-relevant and is logged here;
+the rest are tracked in PROGRESS.md / SUMMARY.md. All fixed via TDD; suites unit 129→135, integration 43→48.
+
+- [med→fixed] src/Portability/ExportService.php — a passphrase set on a host WITHOUT ext-sodium silently
+  produced an UNENCRYPTED bundle (hash_salt + PII) named `.json`, because `bundle()` guarded encryption with
+  `&& BundleCrypto::available()` and fell through to plaintext — the silent downgrade happened on exactly the
+  host class where encryption matters — now THROWS rather than degrade to plaintext (handleExport → clean
+  wp_die); the `.enc` label is derived solely from "passphrase given" so it can never mislabel a plaintext
+  body — **status(fixed)**: integration test proves a passphrase bundle is `.enc`+octet-stream AND decrypts.
+
+Non-security fixes in the same pass (detail in PROGRESS.md): #1 full_restore now type-validates codes/requests
+BEFORE deleteAll (a corrupt bundle no longer wipes-then-crashes); #2 data_merge surfaces a skipped-row
+warning; #4 delete-all-and-reinitialise re-arms the daily DSGVO cron; #5/#6 AdminNotifier send-then-commit +
+carry-over test; #7a schema-version bound; #7b confirm() guards a malformed created_at.

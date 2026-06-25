@@ -2,6 +2,23 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · POST-HANDOFF HARDENING PASS (after STOP).** Ran a 6-dimension multi-agent review
+  (correctness / edge / test-gaps / quality / WP-semantics / data-DSGVO) over the whole branch, every finding
+  adversarially verified → 18 findings → 8 issues. Fixed all via TDD across 5 commits:
+  - **#1 (data-safety):** full_restore wiped both tables BEFORE type-checking codes/requests → a corrupt
+    bundle wiped-then-crashed. Now validates array-type + schema-version bound in the no-side-effects phase.
+  - **#2 (correctness):** data_merge silently dropped id/code/token-colliding rows; now surfaces a skip warning.
+  - **#3 (security/med):** passphrase + no-ext-sodium silently exported the secret bundle as plaintext; now
+    throws (never degrades); encrypted-label dedup'd so it can't mislabel.
+  - **#4 (DSGVO):** delete-all-and-reinitialise left the daily maintenance cron unscheduled → PII
+    anonymization silently stopped. Now re-arms it.
+  - **#5/#6 (notify):** send-then-commit so a throwing mailer doesn't eat the window; + the untested
+    carry-over branch now covered (FakeNotifyStore::expire()).
+  - **#7a/#7b (defensive):** bundle schema-version bound; confirm() guards a malformed created_at.
+  - **tests/tidiness:** anonymized-row lossless round-trip, geo fail-closed→403 integration, requests(PII)-table
+    drop assertions, corrupt-bundle-no-data-loss, dead BASELINE const removed.
+  Suites: **unit 129→135, integration 43→48**, all green. Deferred (logged): merge-warning i18n (return codes
+  from the domain layer) — consistent with the existing English-string pattern; not worth a mechanism change now.
 - **2026-06-25 · STOP CONDITION MET — LOOP COMPLETE.** Whole suite green (unit 129, integration 43); one
   live end-to-end smoke per workstream captured; final whole-branch security review = 0 crit/high/med/low;
   dev DB + tree clean; SUMMARY.md written. Branch `feat/data-lifecycle` ready for review (not pushed/merged;
