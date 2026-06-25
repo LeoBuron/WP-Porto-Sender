@@ -726,17 +726,22 @@ never disables other gates. ✅
 
 # FINAL — STOP CONDITION
 
-- [ ] **Whole unit suite green:** `composer test:unit` → paste summary.
-- [ ] **Whole integration suite green (wp-env):** `npm run test:integration` → paste summary.
-- [ ] **One live end-to-end smoke per workstream** (wp-env + WP-CLI/Playwright), evidence captured:
-  WS2 export⇄wipe⇄re-import round-trip; WS1 issue→admin mail; WS4 delete-all + uninstall residue check;
-  WS3 default-off submit works (+ a forced geo_blocked 403).
-- [ ] **Final whole-branch security review** (`security-review`) with **zero open Critical/High** in
-  SECURITY.md (med/low may be deferred with one-line justification).
-- [ ] **Cleanup:** no seeded test data or `porto_rl_*`/`porto_notify_*` transients left; tree clean except
-  intended changes.
-- [ ] Write `SUMMARY.md` (what shipped, evidence pointers, open sign-off items) and **stop the loop**
-  (do not schedule another iteration).
+- [x] **Whole unit suite green:** `composer test:unit` → **OK (129 tests, 351 assertions)**.
+- [x] **Whole integration suite green (wp-env):** `npm run test:integration` → **OK (43 tests, 143 assertions)**.
+- [x] **One live end-to-end smoke per workstream** (wp-env `wp eval-file`): WS2 export⇄wipe⇄re-import (salt
+  restored); WS1 issue→admin mail (PII-free); WS4 delete-all DROP+recreate+new-salt → restore; WS3 gate
+  blocks FR / allows DE + default-off transparent + REST geo_blocked→403 (integration).
+- [x] **Final whole-branch security review** → SECURITY.md FINAL: **0 Critical / 0 High / 0 Med / 0 Low**.
+- [x] **Cleanup:** dev DB = the 5+1 pre-existing E2E fixtures only (0 `porto_rl_*`/`porto_notify_*` residue,
+  verified via COUNT); working tree clean.
+- [x] Wrote `SUMMARY.md`; **loop stopped** (no further iteration scheduled).
 **Evidence:**
 ```
+# unit OK (129, 351) ; integration OK (43, 143)
+# live smokes: WS2 salt_restored=yes ; WS1 admin_mails=1 pii_free=yes ; WS4 PASS=yes ; WS3 FR=block DE=allow offdefault=yes
+# final whole-branch security review: 0 crit / 0 high / 0 med / 0 low
+# cleanup: wp_options porto_rl_/porto_notify_ COUNT = 0 ; porto_codes=5 porto_requests=1 (E2E fixtures)
 ```
+
+> **🏁 ALL TASKS COMPLETE — loop STOPPED.** WS1–WS4 done, suites green, live smokes captured, whole-branch
+> review clean. Branch `feat/data-lifecycle` ready for review (not pushed/merged; WS3 external sources await sign-off).

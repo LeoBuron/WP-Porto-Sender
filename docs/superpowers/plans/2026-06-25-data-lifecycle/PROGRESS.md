@@ -2,6 +2,10 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · STOP CONDITION MET — LOOP COMPLETE.** Whole suite green (unit 129, integration 43); one
+  live end-to-end smoke per workstream captured; final whole-branch security review = 0 crit/high/med/low;
+  dev DB + tree clean; SUMMARY.md written. Branch `feat/data-lifecycle` ready for review (not pushed/merged;
+  WS3 external geo sources await sign-off). **Loop stopped — no further iteration scheduled.**
 - **2026-06-25 · PHASE B iter 13 — WS3 DONE; ALL 4 WORKSTREAMS DONE.** WS3 security review: 0 crit/high/med,
   1 low (admin-set geo_api_url SSRF → **fixed**: `wp_safe_remote_get`). All HARD-STOP concerns verified
   (CF spoofing ack-gated+surfaced, fail-mode can't disable other gates, externals off/sign-off, no lib/data
@@ -88,7 +92,7 @@
 - WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
 - WS4 (uninstall & lifecycle): **DONE** ✅ — Tasks 14–16 + security review (0 findings) + live DR smoke.
 - WS3 (geo, default-off): **DONE** ✅ — Tasks 17–20 + security review (1 low fixed). Live smoke in STOP CONDITION.
-- FINAL stop-condition: **in progress** — whole suite + per-WS live smokes + whole-branch review + SUMMARY.md.
+- FINAL stop-condition: **DONE** ✅ — whole suite green, per-WS live smokes, whole-branch review (0 crit/high), SUMMARY.md.
 
 ## Open sign-off items (shipped disabled; do not enable unattended)
 - WS3 MaxMind provider (new dep + licensed data) — D42.

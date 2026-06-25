@@ -115,4 +115,22 @@ Non-blocking note (applied): clarified that `wp_cache_flush()` in `purgeAll` is 
 
 Accepted notes: API key rendered into a `type=password` value on the `manage_options`-only page (standard
 WP secret-field handling); `geo_maxmind_db_path`→`is_readable` only, reader absent in the shipped build.
-### FINAL whole-branch — (pending)
+### FINAL whole-branch — reviewed 2026-06-25 (holistic adversarial pass, all 4 workstreams)
+
+**Result: 0 Critical, 0 High, 0 Medium, 0 Low. ZERO open Critical/High — branch passes the stop-condition
+security gate.** Holistic cross-workstream pass over `main..feat/data-lifecycle`. All categories CLEAN:
+- AuthZ: all 6 admin-post handlers (export/import/intake/intake_csv/reset/wipe) cap+nonce gated; no
+  `*_nopriv_*` registrations; the secret-bearing export is fully gated + unencrypted-bundle confirm.
+- SQLi: every query parameterized or table-name-from-constant; `insertRows` column allowlist; DataEraser
+  esc_like'd constant LIKE patterns.
+- Salt+PII export: streamed only (no web-readable file), salt never logged, sodium AEAD encryption.
+- Untrusted import: json/fgetcsv only (no unserialize/eval), validation-before-destruction, size/row caps,
+  imported-settings whitelist.
+- Destructive actions: cap+nonce+confirm, POST-only, no CSRF/GET path; uninstall delegates to the single
+  DataEraser.
+- Geo: pure boolean gate (Throwable-caught) can't disable other gates; order captcha→geo→rate→dedup→stock;
+  REMOTE_ADDR only (no XFF); CF off+ack-gated; API `wp_safe_remote_get` + off-by-default.
+- Seams: nullable notifier/geoGate always wired non-null in production; all new admin render() output
+  escaped + cap-gated; no secret rendered-unescaped/logged.
+
+The four prior per-workstream fixes are all present and correct in the final tree. No files modified by the review.
