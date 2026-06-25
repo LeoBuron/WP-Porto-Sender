@@ -2,6 +2,13 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 12 — WS3 Task 20 DONE; WS3 code-complete.** Wired `GeoGate` into
+  `IssuanceService::submit` (nullable, after captcha / before rate-limit → `geo_blocked`); REST →403;
+  `porto-form.js` message; `Plugin` factory wiring; SettingsPage geo fieldset (CF-ack warning + sign-off
+  fields + DSGVO note). Unit 127→129, integration 41→43; all green.
+  **Next:** WS3 SECURITY REVIEW (proxy-header trust, fail-mode can't disable other gates, API off/key-safe,
+  no lib/data shipped) + WS3 live smoke → WS3 done → **STOP CONDITION** (final full verify + whole-branch
+  review + SUMMARY.md).
 - **2026-06-25 · PHASE B iter 11 — WS3 Tasks 17–19 DONE.** (17) Geo Settings keys (all default OFF/safe);
   (18) GeoProvider interface + Null/Cloudflare/MaxMind/Api providers + factory (ships no MaxMind lib/data,
   Api off without url — HARD-STOPs honoured; factory fails safe to Null); (19) pure `GeoGate` policy
@@ -73,7 +80,7 @@
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
 - WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
 - WS4 (uninstall & lifecycle): **DONE** ✅ — Tasks 14–16 + security review (0 findings) + live DR smoke.
-- WS3 (geo, default-off): **in progress** — Tasks 17–19 ✅; Task 20 (wiring) + SEC pending.
+- WS3 (geo, default-off): **code-complete** — Tasks 17–20 ✅; WS3 SECURITY REVIEW + live smoke pending.
 - FINAL stop-condition: pending.
 
 ## Open sign-off items (shipped disabled; do not enable unattended)

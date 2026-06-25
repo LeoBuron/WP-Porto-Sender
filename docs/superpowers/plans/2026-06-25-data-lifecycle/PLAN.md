@@ -684,20 +684,26 @@ rate-limit**; return `['status'=>'geo_blocked']`), `src/Plugin.php` (construct v
 **Interfaces:** Consumes `GeoGate::allows($rawIp)`. The gate gets the **raw** IP (`$input['ip']`); nothing
 new persisted.
 
-- [ ] Step 1: Unit test — a denying `GeoGate` → `submit()` returns `geo_blocked` and rate-limit/dedup/
-  create are never reached (spies); an allowing gate is transparent.
-- [ ] Step 2: Run unit → FAIL.
-- [ ] Step 3: Implement injection + ordering + REST 403 + JS message + fieldset.
-- [ ] Step 4: Run unit → PASS.
-- [ ] Step 5: Integration — REST `geo_blocked` → HTTP 403 (force a denying provider/config). Run → PASS.
-- [ ] Step 6: Live smoke — with geo disabled (default), a normal submit still works end-to-end (proves the
-  gate is transparent when off). Capture. Commit.
+- [x] Step 1–4: Unit (`IssuanceSubmitTest`) — denying `GeoGate` → `geo_blocked`, downstream
+  (availableCount/createPending/sendConfirmation) never reached; allowing gate transparent (RED→GREEN).
+  Implemented: nullable `?GeoGate` param + step **after captcha, before rate-limit** returning
+  `geo_blocked`; REST `geo_blocked`→403; `porto-form.js` German message; `Plugin` wires
+  `GeoGate(GeoProviderFactory::make($s), $s)`; SettingsPage geo fieldset (enable/provider/countries/
+  fail-mode/CF-ack+warning/sign-off MaxMind+API fields + DSGVO legal-basis note).
+- [x] Step 5: Integration (`GeoBlockedResponseTest`) — denying config → HTTP **403** + `geo_blocked`;
+  geo disabled (default) → **200** `confirmation_sent` (transparent when off). Tested via `handleRequest`
+  directly (avoids racing the plugin's own registered route).
+- [ ] Step 6: default-off live smoke — covered by the integration transparency test + folded into the
+  STOP-CONDITION WS3 live smoke.
 
-**Verify:** unit + integration filters + smoke.
+**Verify:** `--filter IssuanceSubmit` + `--filter GeoBlockedResponse`
 **DoD:** geo gate sits after captcha/before rate-limit, returns 403 when blocking, transparent when off,
-never disables other gates.
+never disables other gates. ✅
 **Evidence:**
 ```
+# unit: denying gate -> geo_blocked, downstream spies never called; allowing -> confirmation_sent.
+# integration: geo_blocked -> 403 ; geo disabled default -> 200/confirmation_sent.
+# full suites: unit 127->129, integration 41->43.
 ```
 
 ### WS3 SECURITY REVIEW (gate before WS3 done)

@@ -24,6 +24,7 @@ document.querySelectorAll('.porto-request-form').forEach((form) => {
       captcha_failed: 'Bitte löse die Sicherheitsabfrage erneut.',
       invalid: 'Bitte fülle alle Felder korrekt aus.',
       rate_limited: 'Zu viele Anfragen. Bitte versuche es später erneut.',
+      geo_blocked: 'Dieser Dienst ist auf Anfragen aus Deutschland beschränkt.',
     };
     msg.textContent = messages[data.status] || 'Es ist ein Fehler aufgetreten.';
   });

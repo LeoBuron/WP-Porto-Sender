@@ -13,6 +13,7 @@ use PortoSender\Limiting\{RequestLimiter, RateLimiter, TransientRateCounterStore
 use PortoSender\Captcha\{AltchaVerifier, NullVerifier, CaptchaVerifier};
 use PortoSender\Mail\Mailer;
 use PortoSender\Notifications\{AdminNotifier, WpNotifyThrottleStore};
+use PortoSender\Geo\{GeoGate, GeoProviderFactory};
 use PortoSender\Issuance\{IssuanceService, UrlConfirmLinkBuilder};
 use PortoSender\Rest\RestController;
 use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar};
@@ -51,7 +52,8 @@ final class Plugin
             $codes, $requests, $mailer,
             new Hasher($s->hashSalt()), new TokenGenerator(), new UrlConfirmLinkBuilder(),
             $s, ProductCatalog::default(), new SystemClock(),
-            new AdminNotifier($s, $mailer, new WpNotifyThrottleStore())
+            new AdminNotifier($s, $mailer, new WpNotifyThrottleStore()),
+            new GeoGate(GeoProviderFactory::make($s), $s)
         );
     }
 

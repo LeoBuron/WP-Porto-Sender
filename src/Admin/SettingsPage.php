@@ -89,6 +89,35 @@ final class SettingsPage
         printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[admin_notify_window_minutes]" value="%3$d"></label></p>',
             esc_attr($opt), esc_html__('Sammelfenster in Minuten (0 = jede Anfrage einzeln)', 'wp-porto-sender'), $s->adminNotifyWindowMinutes());
         echo '</fieldset>';
+        // Geo restriction (default OFF; external sources require sign-off).
+        echo '<fieldset><legend>' . esc_html__('Geo-Beschränkung (nur Deutschland)', 'wp-porto-sender') . '</legend>';
+        printf('<p><label><input type="checkbox" name="%1$s[geo_enabled]" value="1" %2$s> %3$s</label></p>',
+            esc_attr($opt), checked($s->geoEnabled(), true, false),
+            esc_html__('Aktiv (Standard: aus – ohne Aktivierung findet keine IP-Standortverarbeitung statt)', 'wp-porto-sender'));
+        echo '<p><label>' . esc_html__('Geo-Quelle', 'wp-porto-sender') . ' <select name="' . esc_attr($opt) . '[geo_provider]">';
+        foreach (['cloudflare' => 'Cloudflare CF-IPCountry-Header', 'maxmind' => 'MaxMind GeoLite2 (lokale DB)', 'api' => 'Externe API', 'none' => 'Keine'] as $val => $label) {
+            printf('<option value="%s" %s>%s</option>', esc_attr($val), selected($s->geoProvider(), $val, false), esc_html($label));
+        }
+        echo '</select></label></p>';
+        printf('<p><label>%2$s<br><input type="text" name="%1$s[geo_allowed_countries]" value="%3$s"></label></p>',
+            esc_attr($opt), esc_html__('Erlaubte Länder (ISO-2, kommagetrennt)', 'wp-porto-sender'),
+            esc_attr(implode(', ', $s->geoAllowedCountries())));
+        echo '<p><label>' . esc_html__('Bei unbekanntem Standort', 'wp-porto-sender') . ' <select name="' . esc_attr($opt) . '[geo_fail_mode]">';
+        foreach (['open' => 'Durchlassen (empfohlen)', 'closed' => 'Blockieren'] as $val => $label) {
+            printf('<option value="%s" %s>%s</option>', esc_attr($val), selected($s->geoFailOpen() ? 'open' : 'closed', $val, false), esc_html($label));
+        }
+        echo '</select></label></p>';
+        printf('<p><label><input type="checkbox" name="%1$s[geo_cloudflare_ack]" value="1" %2$s> %3$s</label></p>',
+            esc_attr($opt), checked($s->geoCloudflareAck(), true, false),
+            esc_html__('Ich bestätige: die Seite läuft hinter Cloudflare und der Origin ist gegen Direktzugriff gesperrt (sonst ist der CF-Header fälschbar).', 'wp-porto-sender'));
+        echo '<p class="description">' . esc_html__('MaxMind und externe API sind ohne Freigabe deaktiviert (zusätzliche Software bzw. Datenweitergabe an Dritte). Rechtsgrundlage der IP-Verarbeitung: Art. 6 Abs. 1 lit. f DSGVO (Missbrauchsschutz).', 'wp-porto-sender') . '</p>';
+        printf('<p><label>%2$s<br><input type="text" name="%1$s[geo_maxmind_db_path]" value="%3$s"></label></p>',
+            esc_attr($opt), esc_html__('MaxMind .mmdb-Pfad (nur falls Reader + DB installiert)', 'wp-porto-sender'), esc_attr($s->geoMaxmindDbPath()));
+        printf('<p><label>%2$s<br><input type="url" name="%1$s[geo_api_url]" value="%3$s"></label></p>',
+            esc_attr($opt), esc_html__('Geo-API URL (sendet IP an Dritte – Freigabe erforderlich)', 'wp-porto-sender'), esc_attr($s->geoApiUrl()));
+        printf('<p><label>%2$s<br><input type="password" name="%1$s[geo_api_key]" value="%3$s" autocomplete="new-password"></label></p>',
+            esc_attr($opt), esc_html__('Geo-API Schlüssel', 'wp-porto-sender'), esc_attr($s->geoApiKey()));
+        echo '</fieldset>';
         submit_button();
         echo '</form></div>';
     }

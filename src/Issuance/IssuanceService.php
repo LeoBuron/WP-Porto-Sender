@@ -14,6 +14,7 @@ use PortoSender\Support\Clock;
 use PortoSender\Settings\Settings;
 use PortoSender\Postage\ProductCatalog;
 use PortoSender\Notifications\AdminNotifier;
+use PortoSender\Geo\GeoGate;
 
 final class IssuanceService
 {
@@ -31,6 +32,7 @@ final class IssuanceService
         private ProductCatalog $catalog,
         private Clock $clock,
         private ?AdminNotifier $notifier = null,
+        private ?GeoGate $geoGate = null,
     ) {}
 
     /** @return array{status:string} */
@@ -46,6 +48,12 @@ final class IssuanceService
         }
         if (!$this->captcha->verify((string) ($input['captcha'] ?? ''))) {
             return ['status' => 'captcha_failed'];
+        }
+        // Geo eligibility — after captcha (only PoW-paid requests are evaluated, capping any
+        // outbound-provider volume) and before rate-limit. The gate gets the RAW IP; it's a pure
+        // boolean and can never short-circuit the gates below. Default-off => always allows.
+        if ($this->geoGate !== null && !$this->geoGate->allows((string) ($input['ip'] ?? ''))) {
+            return ['status' => 'geo_blocked'];
         }
         if (!$this->rateLimiter->check($this->hasher->ip((string) ($input['ip'] ?? '')))) {
             return ['status' => 'rate_limited'];

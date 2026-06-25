@@ -39,6 +39,7 @@ final class RestController
         $httpStatus = match ($result['status']) {
             'confirmation_sent' => 200,
             'rate_limited' => 429,
+            'geo_blocked' => 403,
             default => 422,
         };
         return new \WP_REST_Response($result, $httpStatus);

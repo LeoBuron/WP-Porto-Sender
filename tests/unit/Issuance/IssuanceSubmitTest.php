@@ -17,6 +17,8 @@ use PortoSender\Support\TokenGenerator;
 use PortoSender\Support\Clock;
 use PortoSender\Settings\Settings;
 use PortoSender\Postage\ProductCatalog;
+use PortoSender\Geo\GeoGate;
+use PortoSender\Geo\GeoProvider;
 
 final class IssuanceSubmitTest extends MockeryTestCase
 {
@@ -36,9 +38,19 @@ final class IssuanceSubmitTest extends MockeryTestCase
             $captcha, $limiter, $rateLimiter, $codes, $requests, $mailer,
             new Hasher('salt'), new TokenGenerator(),
             Mockery::mock(ConfirmLinkBuilder::class)->shouldReceive('build')->andReturn('https://x.test/c?token=t')->getMock(),
-            $settings, ProductCatalog::default(), $clock
+            $settings, ProductCatalog::default(), $clock,
+            null, // notifier
+            $mocks['geo'] ?? null
         );
         return [$svc, compact('captcha', 'requests', 'codes', 'mailer')];
+    }
+
+    private function geoReturning(?string $country): GeoProvider
+    {
+        return new class($country) implements GeoProvider {
+            public function __construct(private ?string $c) {}
+            public function country(string $ip): ?string { return $this->c; }
+        };
     }
 
     private function input(array $over = []): array
@@ -95,5 +107,31 @@ final class IssuanceSubmitTest extends MockeryTestCase
         $m['requests']->shouldNotReceive('createPending');
         $m['mailer']->shouldNotReceive('sendConfirmation');
         $this->assertSame('rate_limited', $svc->submit($this->input())['status']);
+    }
+
+    public function test_geo_blocked_short_circuits_before_rate_limit_and_create(): void
+    {
+        $denyingGeo = new GeoGate(
+            $this->geoReturning('FR'),
+            new Settings(['geo_enabled' => true, 'geo_allowed_countries' => ['DE']])
+        );
+        [$svc, $m] = $this->service(['geo' => $denyingGeo]);
+        $m['codes']->shouldNotReceive('availableCount'); // downstream stock check never reached
+        $m['requests']->shouldNotReceive('createPending');
+        $m['mailer']->shouldNotReceive('sendConfirmation');
+        $this->assertSame('geo_blocked', $svc->submit($this->input())['status']);
+    }
+
+    public function test_geo_allowing_gate_is_transparent(): void
+    {
+        $allowGeo = new GeoGate(
+            $this->geoReturning('DE'),
+            new Settings(['geo_enabled' => true, 'geo_allowed_countries' => ['DE']])
+        );
+        [$svc, $m] = $this->service(['geo' => $allowGeo]);
+        $m['codes']->shouldReceive('availableCount')->andReturn(3);
+        $m['requests']->shouldReceive('createPending')->once()->andReturn(1);
+        $m['mailer']->shouldReceive('sendConfirmation')->once()->andReturn(true);
+        $this->assertSame('confirmation_sent', $svc->submit($this->input())['status']);
     }
 }
