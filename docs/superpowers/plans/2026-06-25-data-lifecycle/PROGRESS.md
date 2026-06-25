@@ -2,6 +2,13 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 13 — WS3 DONE; ALL 4 WORKSTREAMS DONE.** WS3 security review: 0 crit/high/med,
+  1 low (admin-set geo_api_url SSRF → **fixed**: `wp_safe_remote_get`). All HARD-STOP concerns verified
+  (CF spoofing ack-gated+surfaced, fail-mode can't disable other gates, externals off/sign-off, no lib/data
+  shipped). Suites: unit 129, integration 43.
+  **Next: STOP CONDITION** — whole suite + one live end-to-end smoke per workstream (WS2/WS4 done earlier;
+  WS1 issue→mail + WS3 default-off/403 remaining) + final whole-branch security review (zero open crit/high)
+  + cleanup + write SUMMARY.md, then STOP.
 - **2026-06-25 · PHASE B iter 12 — WS3 Task 20 DONE; WS3 code-complete.** Wired `GeoGate` into
   `IssuanceService::submit` (nullable, after captcha / before rate-limit → `geo_blocked`); REST →403;
   `porto-form.js` message; `Plugin` factory wiring; SettingsPage geo fieldset (CF-ack warning + sign-off
@@ -80,8 +87,8 @@
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
 - WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
 - WS4 (uninstall & lifecycle): **DONE** ✅ — Tasks 14–16 + security review (0 findings) + live DR smoke.
-- WS3 (geo, default-off): **code-complete** — Tasks 17–20 ✅; WS3 SECURITY REVIEW + live smoke pending.
-- FINAL stop-condition: pending.
+- WS3 (geo, default-off): **DONE** ✅ — Tasks 17–20 + security review (1 low fixed). Live smoke in STOP CONDITION.
+- FINAL stop-condition: **in progress** — whole suite + per-WS live smokes + whole-branch review + SUMMARY.md.
 
 ## Open sign-off items (shipped disabled; do not enable unattended)
 - WS3 MaxMind provider (new dep + licensed data) — D42.

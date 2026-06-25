@@ -23,7 +23,9 @@ final class ApiGeoProvider implements GeoProvider
             return null;
         }
         $url = add_query_arg(['ip' => $ip, 'key' => $this->apiKey], $this->apiUrl);
-        $resp = wp_remote_get($url, ['timeout' => 3]);
+        // wp_safe_remote_get honours WP's external-host filtering (blocks loopback/private
+        // ranges by default), so a mis-set geo_api_url can't be steered into SSRF.
+        $resp = wp_safe_remote_get($url, ['timeout' => 3]);
         if (is_wp_error($resp) || (int) wp_remote_retrieve_response_code($resp) !== 200) {
             return null;
         }

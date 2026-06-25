@@ -57,21 +57,21 @@ final class GeoProvidersTest extends WpUnitTestCase
         Functions\when('is_wp_error')->justReturn(false);
         Functions\when('wp_remote_retrieve_response_code')->justReturn(200);
         Functions\when('wp_remote_retrieve_body')->justReturn('{"country":"de"}');
-        Functions\expect('wp_remote_get')->once()->andReturn(['fake' => true]);
+        Functions\expect('wp_safe_remote_get')->once()->andReturn(['fake' => true]);
 
         $this->assertSame('DE', (new ApiGeoProvider('https://api.example/geo', 'k'))->country('1.2.3.4'));
     }
 
     public function test_api_provider_empty_url_never_calls(): void
     {
-        Functions\expect('wp_remote_get')->never();
+        Functions\expect('wp_safe_remote_get')->never();
         $this->assertNull((new ApiGeoProvider('', ''))->country('1.2.3.4'));
     }
 
     public function test_api_provider_network_error_is_null(): void
     {
         Functions\when('add_query_arg')->alias(static fn($args, $url) => $url);
-        Functions\when('wp_remote_get')->justReturn(['err']);
+        Functions\when('wp_safe_remote_get')->justReturn(['err']);
         Functions\when('is_wp_error')->justReturn(true);
         $this->assertNull((new ApiGeoProvider('https://api.example/geo', 'k'))->country('1.2.3.4'));
     }

@@ -94,5 +94,25 @@ sanitize casts + `absint`), throttle key integrity (constant option/transient na
 - **Post-wipe state**: `purgeAll → Schema::install → reseed(new salt) → SchemaVersion::set` leaves a functional install.
 
 Non-blocking note (applied): clarified that `wp_cache_flush()` in `purgeAll` is intentionally global (also evicts object-cache-backed `porto_rl_*` transients the LIKE DELETE can't reach). The out-of-scope WS2 import-error reflection remains as logged in the WS2 section (low/accepted).
-### WS3 — (pending)
+### WS3 — reviewed 2026-06-25 (adversarial subagent over the WS3 diff)
+
+**Result: 0 crit, 0 high, 0 med, 1 low.** No crit/high → WS3 not blocked. HARD-STOP concerns all verified:
+- **Cloudflare proxy-header spoofing**: documented (`CloudflareHeaderGeoProvider` docblock) + surfaced in the
+  admin fieldset ("sonst ist der CF-Header fälschbar") + ack-gated (factory returns Null unless
+  `geo_cloudflare_ack`) + default off. Risk surfaced, not silent.
+- **Fail-mode can't disable other gates**: the geo step is a standalone `if` returning only `geo_blocked`;
+  captcha runs before, rate-limit/dedup/stock after on the allow path; `GeoGate` catches `\Throwable`→fail-mode
+  so it can never throw out of `submit()`.
+- **External sources sign-off-gated + off by default**; **no MaxMind lib/data shipped** (sweep confirmed inert;
+  `available()` guards on `class_exists`+`is_readable`); API key never logged; 3s timeout; IP from
+  `REMOTE_ADDR` only (no XFF trust); no new IP persistence; 403 body leaks nothing.
+
+- [low] src/Geo/ApiGeoProvider.php:26 — used `wp_remote_get` (not `wp_safe_remote_get`) on an admin-set URL
+  validated only by `esc_url_raw`, permitting internal/loopback hosts — admin-controlled SSRF (point
+  `geo_api_url` at 169.254.169.254 / an internal host; the visitor request triggers a server-side GET) —
+  switch to `wp_safe_remote_get` (WP external-host filtering blocks private ranges) — **status(fixed)**:
+  switched to `wp_safe_remote_get`; tests updated; suites green (unit 129, integration 43).
+
+Accepted notes: API key rendered into a `type=password` value on the `manage_options`-only page (standard
+WP secret-field handling); `geo_maxmind_db_path`→`is_readable` only, reader absent in the shipped build.
 ### FINAL whole-branch — (pending)

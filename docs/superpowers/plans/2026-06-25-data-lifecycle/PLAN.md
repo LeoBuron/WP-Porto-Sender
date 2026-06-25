@@ -707,12 +707,20 @@ never disables other gates. ✅
 ```
 
 ### WS3 SECURITY REVIEW (gate before WS3 done)
-- [ ] Security-review the WS3 diff → SECURITY.md. Confirm: Cloudflare proxy-header trust documented +
-  ack-gated + default off; gate fail-mode cannot disable other gates; API provider off by default +
-  sign-off + key masked/never logged; no licensed data/lib shipped.
+- [x] Adversarial subagent reviewed the WS3 diff → SECURITY.md. **0 crit/high/med, 1 low.** Confirmed:
+  CF proxy-header trust documented + ack-gated + default off; gate fail-mode (standalone bool + Throwable
+  catch) cannot disable the other gates; API off by default + sign-off + key never logged; no MaxMind
+  lib/data shipped; IP from REMOTE_ADDR only; 403 leaks nothing.
+- [x] Fixed the low via TDD: `ApiGeoProvider` now uses `wp_safe_remote_get` (blocks SSRF to internal/
+  loopback hosts). Suites green (unit 129, integration 43).
 **Evidence:**
 ```
+# verdict: 0/0/0/1 (see SECURITY.md WS3). Low (SSRF on admin-set geo_api_url) -> fixed: wp_safe_remote_get.
+# RED (test stubs wp_safe_remote_get) -> GREEN after provider switch. unit 129, integration 43.
 ```
+
+> **WS3 (Geo-restriction) — DONE.** Tasks 17–20 ✅ + security review ✅ (1 low fixed). External sources ship
+> disabled/sign-off-gated; live end-to-end smoke runs in the STOP CONDITION.
 
 ---
 
