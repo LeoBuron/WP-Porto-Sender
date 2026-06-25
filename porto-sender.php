@@ -19,3 +19,4 @@ if (!defined('ABSPATH')) {
 require_once __DIR__ . '/vendor/autoload.php';
 
 \PortoSender\Plugin::boot(__FILE__);
+\PortoSender\Updates\GitHubUpdates::register(__FILE__);
