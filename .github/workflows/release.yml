@@ -48,7 +48,10 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          # 8.3 for CI: the dev tooling (PHPUnit 11) needs >=8.2. The plugin's runtime
+          # floor stays 8.1 — only altcha ships, and the zip is identical regardless of
+          # the build-PHP version (vendor is downloaded, not compiled).
+          php-version: '8.3'
           tools: composer
 
       - name: Setup Node
