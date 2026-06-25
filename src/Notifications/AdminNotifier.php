@@ -51,10 +51,13 @@ final class AdminNotifier
             return;
         }
 
-        // Leading edge: send now (reporting any carried-over pending), reset, arm.
+        // Leading edge: send FIRST, then commit throttle state. If send() throws (e.g. an
+        // SMTP plugin that raises rather than returning false), pending stays accumulated and
+        // the cooldown is not armed, so the burst remains retryable on the next event instead
+        // of being silently swallowed for a whole window.
+        $this->send($to, $ctx, $pending);
         $this->store->setPending(0);
         $this->store->arm($windowMinutes * 60);
-        $this->send($to, $ctx, $pending);
     }
 
     /**
