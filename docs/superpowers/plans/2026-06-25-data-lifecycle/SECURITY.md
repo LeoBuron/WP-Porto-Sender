@@ -82,6 +82,17 @@ sanitize casts + `absint`), throttle key integrity (constant option/transient na
   WS4 DataEraser/uninstall — **status(fixed in WS4 Task 14)**: `DataEraser::purgeAll` deletes
   `porto_notify_pending` (option) + `porto_notify_cooldown` (transient); proven by `DataEraserTest` and the
   real-`uninstall.php` `UninstallCompletenessTest`.
-### WS4 — (pending)
+### WS4 — reviewed 2026-06-25 (adversarial subagent over the WS4 diff)
+
+**Result: 0 crit, 0 high, 0 med, 0 low.** Fully clean — nothing blocks WS4. Verified:
+- **AuthZ on destructive actions**: `handleReset`/`handleWipe` call `assertAllowed()` FIRST → `current_user_can('manage_options')` (wp_die 403) then `check_admin_referer($nonce)`, then the required `confirm` checkbox, then the destructive call. Correct order; a non-admin or forged request is stopped before any wipe.
+- **CSRF**: nonce-bound (`porto_reset`/`porto_wipe`); a GET/cross-site request without a valid action nonce dies.
+- **SQLi**: DataEraser LIKE prefixes are constants, `esc_like`'d + `$wpdb->prepare`-bound; table names from constants; no input in any query.
+- **Confirm bypass**: `empty($_POST['confirm'])` fails safe (`empty('0')===true`); failure branch ends in `exit`.
+- **Salt**: reset reads the OLD salt before overwriting and never blanks it (regenerates only if empty); delete-all generates a fresh salt intentionally.
+- **Output/JS**: render() forms fully escaped (`esc_html`/`esc_attr`/`esc_url`/`esc_js`/`wp_nonce_field`); per-user notice transient.
+- **Post-wipe state**: `purgeAll → Schema::install → reseed(new salt) → SchemaVersion::set` leaves a functional install.
+
+Non-blocking note (applied): clarified that `wp_cache_flush()` in `purgeAll` is intentionally global (also evicts object-cache-backed `porto_rl_*` transients the LIKE DELETE can't reach). The out-of-scope WS2 import-error reflection remains as logged in the WS2 section (low/accepted).
 ### WS3 — (pending)
 ### FINAL whole-branch — (pending)

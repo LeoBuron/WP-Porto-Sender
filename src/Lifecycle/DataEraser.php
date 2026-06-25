@@ -53,8 +53,11 @@ final class DataEraser
         // Cron: a Delete-without-deactivate never runs Plugin::deactivate().
         wp_clear_scheduled_hook(Maintenance::HOOK);
 
-        // The raw LIKE deletes bypass WP's option/transient cache; flush it so nothing
-        // reads a stale value after this terminal purge.
+        // Flush the WHOLE object cache, intentionally: (1) the raw LIKE deletes above bypass
+        // WP's option cache, so get_option would otherwise read stale values; (2) on
+        // object-cache-backed sites the porto_rl_* transients live in the cache (not in
+        // wp_options), so the LIKE DELETE misses them and only a flush evicts them. The
+        // site-wide blip is acceptable for this terminal purge.
         wp_cache_flush();
     }
 }

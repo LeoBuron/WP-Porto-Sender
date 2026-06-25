@@ -2,6 +2,12 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 10 — WS4 DONE.** WS4 security review: **0 crit/high/med/low** (destructive
+  actions correctly cap+nonce+confirm-gated, no CSRF, esc_like'd LIKE, salt-safe; clarified the global
+  `wp_cache_flush`). WS4 live DR smoke passed on the real DB (export → `deleteAllData` DROP+recreate+new salt
+  → import full_restore → all real data + original salt back; net-zero). Suites: unit 104, integration 41.
+  **3 of 4 workstreams done (WS2, WS1, WS4).** Next: WS3 (geo-restriction, HARD-STOP territory) — Tasks 17–20,
+  all sources default-OFF / sign-off-gated.
 - **2026-06-25 · PHASE B iter 9 — WS4 Task 16 DONE; WS4 code-complete.** ToolsPage reset (preserve salt) /
   delete-all (purge → recreate → new salt) business methods + guarded handlers (cap+nonce+confirm+PRG) +
   `plugin_action_links` pre-removal link. Integration 39→41; unit 104; all green.
@@ -60,7 +66,7 @@
 ## Workstream status
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
 - WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
-- WS4 (uninstall & lifecycle): **code-complete** — Tasks 14–16 ✅; WS4 SECURITY REVIEW + live smoke pending.
+- WS4 (uninstall & lifecycle): **DONE** ✅ — Tasks 14–16 + security review (0 findings) + live DR smoke.
 - WS3 (geo, default-off): not started — Tasks 17–20 + SEC.
 - FINAL stop-condition: pending.
 

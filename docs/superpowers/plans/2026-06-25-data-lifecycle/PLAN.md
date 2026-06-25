@@ -580,12 +580,22 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
 ```
 
 ### WS4 SECURITY REVIEW (gate before WS4 done)
-- [ ] Security-review the WS4 diff → SECURITY.md. Confirm: every destructive action cap+nonce+confirm+PRG,
-  no CSRF/GET path; `DataEraser` SQL uses constant LIKE patterns (no interpolation); reset preserves salt;
-  no secrets logged.
+- [x] Adversarial subagent reviewed the WS4 diff → SECURITY.md. **0 crit/high/med/low.** Confirmed every
+  destructive action is cap+nonce+confirm-gated (in the right order, real `exit`), no CSRF/GET path,
+  constant esc_like'd LIKE patterns (no interpolation), reset preserves salt, no secrets logged. Applied the
+  one clarity note (intentional global `wp_cache_flush`).
+- [x] **WS4 end-to-end live smoke** (real wp-env, `wp eval-file`): export full DB → `deleteAllData()`
+  (DROP+recreate, fresh salt: `after_wipe_codes=0`, salt differs) → import full_restore → all 5 real codes +
+  marker + the ORIGINAL salt restored; net-zero cleanup. PASS.
 **Evidence:**
 ```
+# review verdict: 0/0/0/0 (see SECURITY.md WS4)
+# live smoke: after_wipe_codes=0 new_salt_differs=yes ; restored post_codes=6 salt_restored=yes
+#   marker_code_back=yes marker_token_back=yes ; PASS=yes ; cleanup_codes=5
+# suites: unit 104, integration 41
 ```
+
+> **WS4 (Uninstall & data lifecycle) — DONE.** Tasks 14–16 ✅ + security review ✅ (clean) + live DR smoke ✅.
 
 ---
 
