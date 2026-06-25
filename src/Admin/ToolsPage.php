@@ -12,6 +12,7 @@ use PortoSender\Portability\ExportService;
 use PortoSender\Portability\ImportService;
 use PortoSender\Portability\BundleCrypto;
 use PortoSender\Lifecycle\DataEraser;
+use PortoSender\Cron\Maintenance;
 
 /**
  * "Export & Import" admin page (Werkzeuge): streams per-table CSV and the
@@ -111,6 +112,13 @@ final class ToolsPage
         $defaults['hash_salt'] = wp_generate_password(64, false, false);
         update_option(Settings::OPTION, $defaults);
         (new SchemaVersion())->set(Schema::CURRENT_VERSION);
+
+        // purgeAll cleared the daily maintenance cron (correct for uninstall). A clean-slate
+        // re-init is NOT an uninstall, so re-arm it (mirrors Plugin::activate) — otherwise the
+        // DSGVO PII-anonymization / stale-reservation / pending-cleanup job silently stops.
+        if (!wp_next_scheduled(Maintenance::HOOK)) {
+            wp_schedule_event(time() + 3600, 'daily', Maintenance::HOOK);
+        }
     }
 
     // ---------- admin-post handlers (thin, guarded) ----------

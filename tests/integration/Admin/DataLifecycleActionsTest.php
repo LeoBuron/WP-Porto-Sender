@@ -8,6 +8,7 @@ use PortoSender\Requests\RequestRepository;
 use PortoSender\Persistence\Schema;
 use PortoSender\Persistence\SchemaVersion;
 use PortoSender\Settings\Settings;
+use PortoSender\Cron\Maintenance;
 
 final class DataLifecycleActionsTest extends PortoTestCase
 {
@@ -17,6 +18,7 @@ final class DataLifecycleActionsTest extends PortoTestCase
         remove_filter('query', [$this, '_create_temporary_tables']);
         remove_filter('query', [$this, '_drop_temporary_tables']);
         Schema::install($GLOBALS['wpdb']);
+        wp_clear_scheduled_hook(Maintenance::HOOK);
         parent::tearDown();
     }
 
@@ -56,5 +58,19 @@ final class DataLifecycleActionsTest extends PortoTestCase
         $this->assertSame('', $opt['owner_address']);          // defaults
         $this->assertSame('1', get_option(SchemaVersion::OPTION));
         $this->assertSame(0, $codes->availableCount('standardbrief', new \DateTimeImmutable('now'))); // empty, recreated
+    }
+
+    public function test_delete_all_data_reschedules_the_daily_maintenance_cron(): void
+    {
+        global $wpdb;
+        remove_filter('query', [$this, '_drop_temporary_tables']);
+        // purgeAll clears the hook; start from "not scheduled" to prove deleteAllData re-arms it.
+        wp_clear_scheduled_hook(Maintenance::HOOK);
+        $this->assertFalse(wp_next_scheduled(Maintenance::HOOK));
+
+        (new ToolsPage(new CodeRepository($wpdb), new RequestRepository($wpdb)))->deleteAllData();
+
+        // Without rescheduling, the DSGVO anonymization / pending-cleanup cron silently stops.
+        $this->assertNotFalse(wp_next_scheduled(Maintenance::HOOK), 'daily maintenance cron must be re-armed after a clean-slate wipe');
     }
 }
