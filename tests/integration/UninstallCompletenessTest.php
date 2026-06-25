@@ -38,6 +38,8 @@ final class UninstallCompletenessTest extends PortoTestCase
         $this->assertFalse(get_transient('porto_rl_ip_zzz_1'), 'rate-limit transient gone');
         $this->assertFalse(wp_next_scheduled(Maintenance::HOOK), 'cron unscheduled');
         $codesTable = Schema::codesTable($wpdb);
+        $requestsTable = Schema::requestsTable($wpdb);
         $this->assertNull($wpdb->get_var("SHOW TABLES LIKE '$codesTable'"), 'codes table dropped');
+        $this->assertNull($wpdb->get_var("SHOW TABLES LIKE '$requestsTable'"), 'requests (PII) table dropped');
     }
 }

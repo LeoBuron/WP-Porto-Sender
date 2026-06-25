@@ -56,6 +56,24 @@ final class GeoBlockedResponseTest extends PortoTestCase
         $this->assertSame(403, $res->get_status());
     }
 
+    public function test_unknown_country_fails_closed_maps_to_http_403(): void
+    {
+        // Unknown country + fail-CLOSED is the security-relevant deny branch. Prove it
+        // composes through submit + RestController to a 403 end-to-end, not just in the
+        // pure GeoGate unit (where it was the only coverage).
+        $settings = new Settings([
+            'enabled_products' => ['grossbrief'], 'geo_enabled' => true,
+            'geo_allowed_countries' => ['DE'], 'geo_fail_mode' => 'closed',
+        ]);
+        $unknownGeo = new GeoGate(
+            new class implements GeoProvider { public function country(string $ip): ?string { return null; } },
+            $settings
+        );
+        $res = $this->post($this->service($settings, $unknownGeo));
+        $this->assertSame('geo_blocked', $res->get_data()['status']);
+        $this->assertSame(403, $res->get_status());
+    }
+
     public function test_geo_disabled_default_is_transparent(): void
     {
         add_filter('pre_wp_mail', '__return_true');

@@ -8,6 +8,7 @@ use PortoSender\Persistence\SchemaVersion;
 use PortoSender\Settings\Settings;
 use PortoSender\Notifications\WpNotifyThrottleStore;
 use PortoSender\Inventory\CodeRepository;
+use PortoSender\Requests\RequestRepository;
 use PortoSender\Cron\Maintenance;
 
 final class DataEraserTest extends PortoTestCase
@@ -26,6 +27,11 @@ final class DataEraserTest extends PortoTestCase
     {
         global $wpdb;
         (new CodeRepository($wpdb))->addBatch('standardbrief', 95, new \DateTimeImmutable('2026-01-15'), ['ERASE1']);
+        // Seed a PII-bearing request — the whole point of a DSGVO purge is to drop this table.
+        (new RequestRepository($wpdb))->createPending([
+            'name' => 'Erase Me', 'email' => 'erase@example.test', 'email_hash' => 'eh', 'name_hash' => 'nh',
+            'product' => 'standardbrief', 'token_hash' => 'erase-tok', 'ip_hash' => null, 'created_at' => '2026-01-15 10:00:00',
+        ]);
 
         // Let purgeAll's DROP TABLE hit the real tables — WP_UnitTestCase otherwise rewrites
         // DROP TABLE -> DROP TEMPORARY TABLE, a no-op on the class's real tables.
@@ -45,7 +51,9 @@ final class DataEraserTest extends PortoTestCase
         DataEraser::purgeAll($wpdb);
 
         $codesTable = Schema::codesTable($wpdb);
+        $requestsTable = Schema::requestsTable($wpdb);
         $this->assertNull($wpdb->get_var("SHOW TABLES LIKE '$codesTable'"), 'codes table dropped');
+        $this->assertNull($wpdb->get_var("SHOW TABLES LIKE '$requestsTable'"), 'requests (PII) table dropped');
         $this->assertFalse(get_option(Settings::OPTION), 'settings option gone');
         $this->assertFalse(get_option(SchemaVersion::OPTION), 'schema version option gone');
         $this->assertFalse(get_option('porto_sender_lowstock_standardbrief'), 'lowstock flag gone');

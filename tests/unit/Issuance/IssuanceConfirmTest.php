@@ -54,6 +54,19 @@ final class IssuanceConfirmTest extends MockeryTestCase
         $this->assertSame('expired', $svc->confirm('t')['status']); // >48h old
     }
 
+    public function test_unparseable_created_at_is_invalid_token_not_fatal(): void
+    {
+        // A corrupted/imported request row with a non-datetime created_at must not raise a
+        // fatal in the front-end confirm flow (a new error path opened by the import feature).
+        $requests = Mockery::mock(RequestStore::class);
+        $requests->shouldReceive('findByTokenHash')->andReturn((object) [
+            'id' => 1, 'status' => 'pending', 'product' => 'grossbrief', 'email' => 'v@e.de',
+            'name' => 'V', 'email_hash' => 'E', 'created_at' => 'not-a-date',
+        ]);
+        $svc = $this->service(Mockery::mock(CodeStore::class), $requests, Mockery::mock(MailerInterface::class));
+        $this->assertSame('invalid_token', $svc->confirm('t')['status']);
+    }
+
     public function test_happy_path_issues_code_and_emails_it(): void
     {
         $requests = Mockery::mock(RequestStore::class);

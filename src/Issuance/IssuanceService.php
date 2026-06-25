@@ -100,7 +100,14 @@ final class IssuanceService
         }
 
         $now = $this->clock->now();
-        $expiresAt = (new \DateTimeImmutable($req->created_at))->modify('+' . $this->settings->confirmTokenTtlHours() . ' hours');
+        // created_at is normally a 'Y-m-d H:i:s' string written by createPending, but the
+        // import feature can introduce a row with an unparseable value; parse defensively
+        // (matching CodesCsvImporter) so a corrupt row yields invalid_token, not a fatal.
+        $created = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string) $req->created_at);
+        if ($created === false) {
+            return ['status' => 'invalid_token'];
+        }
+        $expiresAt = $created->modify('+' . $this->settings->confirmTokenTtlHours() . ' hours');
         if ($now > $expiresAt) {
             return ['status' => 'expired'];
         }

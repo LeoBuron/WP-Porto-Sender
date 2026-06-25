@@ -18,9 +18,6 @@ final class SchemaVersion
 {
     public const OPTION = 'porto_sender_schema_version';
 
-    /** The version at which schema versioning was introduced (the baseline). */
-    public const BASELINE = '1';
-
     public function current(): string
     {
         return (string) get_option(self::OPTION, '');
