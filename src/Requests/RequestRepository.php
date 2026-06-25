@@ -99,11 +99,11 @@ final class RequestRepository implements RequestStore
         return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$args)) > 0;
     }
 
-    public function deleteExpiredPending(\DateTimeImmutable $now, int $ttlHours): int
+    public function deleteUnconfirmedOlderThan(\DateTimeImmutable $cutoff): int
     {
-        $cutoff = $now->modify("-{$ttlHours} hours")->format('Y-m-d H:i:s');
         return (int) $this->wpdb->query($this->wpdb->prepare(
-            "DELETE FROM {$this->table()} WHERE status='pending' AND created_at < %s", $cutoff
+            "DELETE FROM {$this->table()} WHERE status='pending' AND created_at < %s",
+            $cutoff->format('Y-m-d H:i:s')
         ));
     }
 

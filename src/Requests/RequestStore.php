@@ -10,7 +10,8 @@ interface RequestStore
     public function markConfirmed(int $id, \DateTimeImmutable $now): bool;
     public function markIssued(int $id, int $codeId, \DateTimeImmutable $now): bool;
     public function hasPriorRequest(?string $emailHash, ?string $nameHash): bool;
-    public function deleteExpiredPending(\DateTimeImmutable $now, int $ttlHours): int;
+    /** Purge never-confirmed (pending) requests created before $cutoff — the unconfirmed-retention window. */
+    public function deleteUnconfirmedOlderThan(\DateTimeImmutable $cutoff): int;
     public function anonymizeOlderThan(\DateTimeImmutable $cutoff): int;
     /** @return array<int,array<string,mixed>> every requests row as an associative array (for export) */
     public function allRows(): array;

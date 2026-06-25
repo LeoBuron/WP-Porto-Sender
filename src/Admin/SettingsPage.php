@@ -61,7 +61,8 @@ final class SettingsPage
         // Simple text/number fields
         $fields = [
             'alert_email' => [__('Alarm-E-Mail', 'wp-porto-sender'), 'email', $s->alertEmail()],
-            'pii_retention_days' => [__('Datenaufbewahrung (Tage)', 'wp-porto-sender'), 'number', $s->piiRetentionDays()],
+            'pii_retention_days' => [__('Datenaufbewahrung ausgegebener Portos (Tage)', 'wp-porto-sender'), 'number', $s->piiRetentionDays()],
+            'unconfirmed_retention_days' => [__('Aufbewahrung unbestätigter Anfragen (Tage)', 'wp-porto-sender'), 'number', $s->unconfirmedRetentionDays()],
             'altcha_hmac_secret' => [__('Altcha HMAC-Secret', 'wp-porto-sender'), 'text', $s->altchaHmacSecret()],
             'privacy_policy_url' => [__('Datenschutz-URL', 'wp-porto-sender'), 'url', $s->privacyPolicyUrl()],
         ];

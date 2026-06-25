@@ -51,6 +51,7 @@ final class Settings
             'geo_api_url' => '',
             'geo_api_key' => '',
             'pii_retention_days' => 180,
+            'unconfirmed_retention_days' => 30,
             'captcha_provider' => 'altcha',
             'altcha_hmac_secret' => '',
             'confirm_token_ttl_hours' => 48,
@@ -87,6 +88,7 @@ final class Settings
     public function geoApiUrl(): string { return (string) $this->values['geo_api_url']; }
     public function geoApiKey(): string { return (string) $this->values['geo_api_key']; }
     public function piiRetentionDays(): int { return (int) $this->values['pii_retention_days']; }
+    public function unconfirmedRetentionDays(): int { return (int) $this->values['unconfirmed_retention_days']; }
     public function captchaProvider(): string { return (string) $this->values['captcha_provider']; }
     public function altchaHmacSecret(): string { return (string) $this->values['altcha_hmac_secret']; }
     public function confirmTokenTtlHours(): int { return (int) $this->values['confirm_token_ttl_hours']; }
@@ -114,6 +116,7 @@ final class Settings
         $result['request_limit_mode'] = in_array($input['request_limit_mode'] ?? '', self::MODES, true) ? $input['request_limit_mode'] : $result['request_limit_mode'];
         $result['alert_email'] = sanitize_email($input['alert_email'] ?? $result['alert_email']);
         $result['pii_retention_days'] = max(1, (int) ($input['pii_retention_days'] ?? $result['pii_retention_days']));
+        $result['unconfirmed_retention_days'] = max(1, (int) ($input['unconfirmed_retention_days'] ?? $result['unconfirmed_retention_days']));
         $result['altcha_hmac_secret'] = sanitize_text_field($input['altcha_hmac_secret'] ?? $result['altcha_hmac_secret']);
         $result['privacy_policy_url'] = esc_url_raw($input['privacy_policy_url'] ?? $result['privacy_policy_url']);
         // Rate limiting (form-rendered; an absent checkbox means "off").

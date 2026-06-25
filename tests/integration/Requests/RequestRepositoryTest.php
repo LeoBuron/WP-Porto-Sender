@@ -59,10 +59,15 @@ final class RequestRepositoryTest extends PortoTestCase
         $this->assertFalse($this->repo->hasPriorRequest(null, null));
     }
 
-    public function test_delete_expired_pending_and_anonymize(): void
+    public function test_delete_unconfirmed_older_than_retains_recent_and_anonymize(): void
     {
-        $old = $this->pending(str_repeat('a',64), str_repeat('b',64), str_repeat('c',64), '2026-06-20 10:00:00');
-        $this->assertSame(1, $this->repo->deleteExpiredPending(new \DateTimeImmutable('2026-06-24 10:00:00'), 48));
+        $this->pending(str_repeat('a',64), str_repeat('b',64), str_repeat('c',64), '2026-05-01 10:00:00'); // old
+        $this->pending(str_repeat('h',64), str_repeat('i',64), str_repeat('j',64), '2026-06-23 10:00:00'); // recent
+
+        // Retention cutoff 2026-06-01: the May unconfirmed row is purged, the June one is RETAINED for audit.
+        $this->assertSame(1, $this->repo->deleteUnconfirmedOlderThan(new \DateTimeImmutable('2026-06-01 00:00:00')));
+        $this->assertNull($this->repo->findByTokenHash(str_repeat('c',64)));
+        $this->assertNotNull($this->repo->findByTokenHash(str_repeat('j',64)));
 
         $keep = $this->pending(str_repeat('d',64), str_repeat('f',64), str_repeat('g',64));
         $this->repo->markIssued($keep, 1, new \DateTimeImmutable('2026-01-01 10:00:00'));

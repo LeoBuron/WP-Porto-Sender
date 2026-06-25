@@ -30,7 +30,9 @@ final class Maintenance
         $now = $this->clock->now();
         $this->codes->releaseStaleReservations($now);
         $this->codes->quarantineExpired($now);
-        $this->requests->deleteExpiredPending($now, $this->settings->confirmTokenTtlHours());
+        // Retain never-confirmed requests for the configured window (abuse/fraud audit), then purge.
+        // Token EXPIRY is separate (confirm() rejects tokens past confirm_token_ttl_hours).
+        $this->requests->deleteUnconfirmedOlderThan($now->modify('-' . $this->settings->unconfirmedRetentionDays() . ' days'));
         $this->requests->anonymizeOlderThan($now->modify('-' . $this->settings->piiRetentionDays() . ' days'));
         $this->alerter->evaluate();
     }

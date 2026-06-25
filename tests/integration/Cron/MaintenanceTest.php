@@ -26,12 +26,13 @@ final class MaintenanceTest extends PortoTestCase
 
         $clock = Mockery::mock(Clock::class);
         $clock->shouldReceive('now')->andReturn(new \DateTimeImmutable('2026-06-24 03:00:00'));
-        $settings = new Settings(['enabled_products' => ['grossbrief'], 'alert_email' => '', 'pii_retention_days' => 180]);
+        $settings = new Settings(['enabled_products' => ['grossbrief'], 'alert_email' => '', 'pii_retention_days' => 180, 'unconfirmed_retention_days' => 7]);
         $alerter = new StockAlerter($codes, $settings, new Mailer($settings), ProductCatalog::default(), $clock);
 
         (new Maintenance($codes, $requests, $alerter, $settings, $clock))->run();
 
         $this->assertSame(1, $codes->countsByStatus('grossbrief')['expired']);
-        $this->assertNull($requests->findByTokenHash(str_repeat('c', 64))); // pending older than 48h deleted
+        // The unconfirmed request is ~23 days old > the 7-day retention window -> purged.
+        $this->assertNull($requests->findByTokenHash(str_repeat('c', 64)));
     }
 }

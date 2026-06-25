@@ -21,6 +21,7 @@ final class SettingsTest extends WpUnitTestCase
         $s = new Settings();
         $this->assertSame('name_or_email', $s->requestLimitMode());
         $this->assertSame(180, $s->piiRetentionDays());
+        $this->assertSame(30, $s->unconfirmedRetentionDays());
         $this->assertSame(48, $s->confirmTokenTtlHours());
         $this->assertSame(5, $s->lowStockThreshold('grossbrief'));
         $this->assertSame('altcha', $s->captchaProvider());
@@ -37,9 +38,10 @@ final class SettingsTest extends WpUnitTestCase
     public function test_sanitize_clamps_and_whitelists(): void
     {
         \Brain\Monkey\Functions\when('get_option')->justReturn([]);
-        $out = Settings::sanitize(['request_limit_mode' => 'bogus', 'pii_retention_days' => '-9', 'enabled_products' => ['grossbrief', 'evil']]);
+        $out = Settings::sanitize(['request_limit_mode' => 'bogus', 'pii_retention_days' => '-9', 'unconfirmed_retention_days' => '-3', 'enabled_products' => ['grossbrief', 'evil']]);
         $this->assertSame('name_or_email', $out['request_limit_mode']);
         $this->assertGreaterThanOrEqual(1, $out['pii_retention_days']);
+        $this->assertGreaterThanOrEqual(1, $out['unconfirmed_retention_days']);
         $this->assertSame(['grossbrief'], $out['enabled_products']);
     }
 
