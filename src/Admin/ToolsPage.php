@@ -164,20 +164,44 @@ final class ToolsPage
             $result = $this->importResult($contents, $passphrase, $mode);
             $msg = sprintf(
                 /* translators: 1: codes count, 2: requests count */
-                __('Import complete: %1$d codes, %2$d requests.', 'wp-porto-sender'),
+                __('Import abgeschlossen: %1$d Codes, %2$d Anfragen.', 'wp-porto-sender'),
                 $result['codes'],
                 $result['requests']
             );
-            if (!empty($result['warnings'])) {
-                $msg .= ' ' . implode(' ', $result['warnings']);
+            $texts = array_filter(array_map([$this, 'importWarningText'], $result['warnings']));
+            if ($texts !== []) {
+                $msg .= ' ' . implode(' ', $texts);
             }
             $type = 'success';
         } catch (\Throwable $e) {
-            $msg = __('Import failed.', 'wp-porto-sender') . ' ' . $e->getMessage();
+            $msg = __('Import fehlgeschlagen.', 'wp-porto-sender') . ' ' . $e->getMessage();
             $type = 'error';
         }
 
         $this->redirectWithNotice($type, $msg);
+    }
+
+    /**
+     * Render an ImportService warning code as translated admin text.
+     *
+     * @param array{code:string,count?:int} $warning
+     */
+    private function importWarningText(array $warning): string
+    {
+        return match ($warning['code'] ?? '') {
+            ImportService::WARN_SALT_MISMATCH => __('Importierte Zeilen wurden mit dem Salt der Quell-Installation gehasht; ist dieser hier nicht identisch, greifen Dedup und Token-Abgleich nicht. Für eine verlustfreie Migration „Vollständige Wiederherstellung“ verwenden.', 'wp-porto-sender'),
+            ImportService::WARN_ROWS_SKIPPED => sprintf(
+                /* translators: %d: number of skipped rows */
+                _n(
+                    '%d Zeile übersprungen (ID/Code/Token existiert hier bereits); Zusammenführen kann installationsübergreifende Beziehungen nicht erhalten.',
+                    '%d Zeilen übersprungen (ID/Code/Token existieren hier bereits); Zusammenführen kann installationsübergreifende Beziehungen nicht erhalten.',
+                    (int) ($warning['count'] ?? 0),
+                    'wp-porto-sender'
+                ),
+                (int) ($warning['count'] ?? 0)
+            ),
+            default => '',
+        };
     }
 
     public function handleReset(): void

@@ -30,6 +30,11 @@ final class ImportService
     public const MODE_FULL = 'full_restore';
     public const MODE_MERGE = 'data_merge';
 
+    // Warning codes — the WP/presentation layer (ToolsPage) renders the translated text,
+    // so the domain layer stays free of i18n.
+    public const WARN_SALT_MISMATCH = 'salt_mismatch';
+    public const WARN_ROWS_SKIPPED = 'rows_skipped';
+
     public function __construct(
         private CodeStore $codes,
         private RequestStore $requests,
@@ -39,7 +44,7 @@ final class ImportService
     }
 
     /**
-     * @return array{mode:string, codes:int, requests:int, warnings:array<int,string>}
+     * @return array{mode:string, codes:int, requests:int, warnings:array<int,array{code:string,count?:int}>}
      * @throws \RuntimeException on a bad/locked bundle, \InvalidArgumentException on an unknown mode
      */
     public function importBundle(string $blob, ?string $passphrase, string $mode): array
@@ -83,21 +88,15 @@ final class ImportService
             $insertedCodes = $this->codes->insertRows($codes);
             $insertedRequests = $this->requests->insertRows($requests);
 
-            $warnings = [
-                'Imported rows were hashed under the source install\'s salt. Unless this install '
-                . 'uses the same hash_salt, dedup and confirmation-token matching will not align '
-                . 'with the imported data. Use Full restore for a lossless migration.',
-            ];
+            // Imported hashes were computed under the source salt; unless this install shares it,
+            // dedup/token matching won't align. (Codes, not text — ToolsPage renders the message.)
+            $warnings = [['code' => self::WARN_SALT_MISMATCH]];
             // Surface silently-dropped rows: merging into a non-empty install collides on the
             // primary key / unique code / token, so insertRows skips those rows. Don't report
             // "complete" while rows were dropped.
             $skipped = ($attemptedCodes - $insertedCodes) + ($attemptedRequests - $insertedRequests);
             if ($skipped > 0) {
-                $warnings[] = sprintf(
-                    '%d row(s) were skipped because their id/code/token already exist on this install; '
-                    . 'data_merge cannot preserve cross-install relationships. Use Full restore for a lossless migration.',
-                    $skipped
-                );
+                $warnings[] = ['code' => self::WARN_ROWS_SKIPPED, 'count' => $skipped];
             }
 
             return ['mode' => $mode, 'codes' => $insertedCodes, 'requests' => $insertedRequests, 'warnings' => $warnings];

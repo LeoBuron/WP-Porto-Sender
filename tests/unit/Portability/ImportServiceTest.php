@@ -110,8 +110,8 @@ final class ImportServiceTest extends WpUnitTestCase
         $this->assertSame('data_merge', $result['mode']);
         $this->assertSame(1, $result['codes']);
         $this->assertSame(1, $result['requests']); // merge inserts requests too (regression guard)
-        $this->assertNotEmpty($result['warnings']);
-        $this->assertStringContainsStringIgnoringCase('salt', $result['warnings'][0]);
+        // Warnings are translation-free CODES (the WP layer renders the text).
+        $this->assertContains(ImportService::WARN_SALT_MISMATCH, array_column($result['warnings'], 'code'));
     }
 
     public function test_data_merge_warns_when_rows_are_skipped_on_collision(): void
@@ -123,8 +123,9 @@ final class ImportServiceTest extends WpUnitTestCase
         $result = $svc->importBundle($this->bundleJson(), null, ImportService::MODE_MERGE);
 
         $this->assertSame(0, $result['codes']);
-        $joined = strtolower(implode(' | ', $result['warnings']));
-        $this->assertStringContainsString('skip', $joined);
+        $skipped = array_values(array_filter($result['warnings'], fn ($w) => $w['code'] === ImportService::WARN_ROWS_SKIPPED));
+        $this->assertCount(1, $skipped);
+        $this->assertSame(1, $skipped[0]['count']); // 1 code dropped on collision
     }
 
     public function test_full_restore_aborts_on_non_array_codes_without_touching_db(): void
