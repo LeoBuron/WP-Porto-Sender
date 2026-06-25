@@ -109,8 +109,50 @@ final class ImportServiceTest extends WpUnitTestCase
 
         $this->assertSame('data_merge', $result['mode']);
         $this->assertSame(1, $result['codes']);
+        $this->assertSame(1, $result['requests']); // merge inserts requests too (regression guard)
         $this->assertNotEmpty($result['warnings']);
         $this->assertStringContainsStringIgnoringCase('salt', $result['warnings'][0]);
+    }
+
+    public function test_data_merge_warns_when_rows_are_skipped_on_collision(): void
+    {
+        $svc = $this->service();
+        // 0 of 1 codes inserted (id/code collision with existing rows).
+        $this->codeStore->shouldReceive('insertRows')->andReturn(0);
+
+        $result = $svc->importBundle($this->bundleJson(), null, ImportService::MODE_MERGE);
+
+        $this->assertSame(0, $result['codes']);
+        $joined = strtolower(implode(' | ', $result['warnings']));
+        $this->assertStringContainsString('skip', $joined);
+    }
+
+    public function test_full_restore_aborts_on_non_array_codes_without_touching_db(): void
+    {
+        Functions\expect('update_option')->never();
+        $svc = $this->service();
+        $this->codeStore->shouldNotReceive('deleteAll');
+        $this->reqStore->shouldNotReceive('deleteAll');
+
+        // Structurally valid bundle (keys present, format_version ok) but codes is a scalar.
+        $bad = json_encode([
+            'format_version' => 1, 'schema_version' => '1',
+            'settings' => ['hash_salt' => 'x'], 'codes' => 'oops', 'requests' => [],
+        ]);
+        $this->expectException(\RuntimeException::class);
+        $svc->importBundle((string) $bad, null, ImportService::MODE_FULL);
+    }
+
+    public function test_full_restore_aborts_on_too_new_schema_version_without_touching_db(): void
+    {
+        Functions\expect('update_option')->never();
+        $svc = $this->service();
+        $this->codeStore->shouldNotReceive('deleteAll');
+        $this->reqStore->shouldNotReceive('deleteAll');
+
+        $tooNew = (new BundleSerializer())->build(['hash_salt' => 'x'], [], [], '999', 'https://src.test', '2026-06-25 00:00:00');
+        $this->expectException(\RuntimeException::class);
+        $svc->importBundle($tooNew, null, ImportService::MODE_FULL);
     }
 
     public function test_encrypted_bundle_without_passphrase_throws_before_side_effects(): void

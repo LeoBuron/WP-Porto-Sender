@@ -6,14 +6,15 @@ namespace PortoSender\Portability;
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Requests\RequestStore;
 use PortoSender\Settings\Settings;
+use PortoSender\Persistence\Schema;
 use PortoSender\Persistence\SchemaVersion;
 
 /**
  * Applies an import bundle.
  *
- * All validation (decrypt + parse + version check) happens BEFORE any
- * destructive step, so a malformed or wrong-version bundle aborts without
- * touching the database.
+ * All validation (decrypt + parse + array-type check + schema-version bound)
+ * happens BEFORE any destructive step, so a malformed, wrong-version, or
+ * structurally-corrupt bundle aborts WITHOUT touching the database.
  *
  * - full_restore: clear both data tables (DELETE — DML, transaction-safe; the
  *   tables already exist from activation), re-insert every row, then replace the
@@ -43,11 +44,26 @@ final class ImportService
      */
     public function importBundle(string $blob, ?string $passphrase, string $mode): array
     {
-        // --- validation phase: no side effects ---
+        // --- validation phase: NO destructive side effects until everything here passes ---
         $json = $this->maybeDecrypt($blob, $passphrase);
-        $data = $this->serializer->parse($json); // throws on malformed / unsupported version
+        $data = $this->serializer->parse($json); // throws on malformed JSON / missing keys / bad format_version
         $codes = $data['codes'];
         $requests = $data['requests'];
+
+        // Type-check BEFORE any deleteAll(): a structurally-valid bundle with a scalar/null
+        // codes/requests would otherwise TypeError on insertRows AFTER the tables were wiped.
+        if (!is_array($codes) || !is_array($requests)) {
+            throw new \RuntimeException('Bundle is malformed: "codes" and "requests" must be arrays.');
+        }
+        // Refuse a bundle from a newer plugin: its rows/schema may not fit our tables.
+        $schemaVersion = (string) $data['schema_version'];
+        if (version_compare($schemaVersion, Schema::CURRENT_VERSION, '>')) {
+            throw new \RuntimeException(sprintf(
+                'Bundle schema version %s is newer than this plugin supports (%s); upgrade the plugin before importing.',
+                $schemaVersion,
+                Schema::CURRENT_VERSION
+            ));
+        }
 
         // --- apply phase ---
         if ($mode === self::MODE_FULL) {
@@ -56,25 +72,35 @@ final class ImportService
             $insertedCodes = $this->codes->insertRows($codes);
             $insertedRequests = $this->requests->insertRows($requests);
             update_option(Settings::OPTION, $this->sanitizeImportedSettings($data['settings'])); // restores salt
-            (new SchemaVersion())->set((string) $data['schema_version']);
+            (new SchemaVersion())->set($schemaVersion);
 
             return ['mode' => $mode, 'codes' => $insertedCodes, 'requests' => $insertedRequests, 'warnings' => []];
         }
 
         if ($mode === self::MODE_MERGE) {
+            $attemptedCodes = count($codes);
+            $attemptedRequests = count($requests);
             $insertedCodes = $this->codes->insertRows($codes);
             $insertedRequests = $this->requests->insertRows($requests);
 
-            return [
-                'mode' => $mode,
-                'codes' => $insertedCodes,
-                'requests' => $insertedRequests,
-                'warnings' => [
-                    'Imported rows were hashed under the source install\'s salt. Unless this install '
-                    . 'uses the same hash_salt, dedup and confirmation-token matching will not align '
-                    . 'with the imported data. Use Full restore for a lossless migration.',
-                ],
+            $warnings = [
+                'Imported rows were hashed under the source install\'s salt. Unless this install '
+                . 'uses the same hash_salt, dedup and confirmation-token matching will not align '
+                . 'with the imported data. Use Full restore for a lossless migration.',
             ];
+            // Surface silently-dropped rows: merging into a non-empty install collides on the
+            // primary key / unique code / token, so insertRows skips those rows. Don't report
+            // "complete" while rows were dropped.
+            $skipped = ($attemptedCodes - $insertedCodes) + ($attemptedRequests - $insertedRequests);
+            if ($skipped > 0) {
+                $warnings[] = sprintf(
+                    '%d row(s) were skipped because their id/code/token already exist on this install; '
+                    . 'data_merge cannot preserve cross-install relationships. Use Full restore for a lossless migration.',
+                    $skipped
+                );
+            }
+
+            return ['mode' => $mode, 'codes' => $insertedCodes, 'requests' => $insertedRequests, 'warnings' => $warnings];
         }
 
         throw new \InvalidArgumentException('Unknown import mode: ' . $mode);
