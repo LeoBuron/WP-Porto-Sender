@@ -557,14 +557,21 @@ fieldset); Test `tests/integration/AdminNotificationFlowTest.php`.
   → re-seed defaults with a **new** salt. Both: cap + `check_admin_referer` + a required confirm checkbox +
   PRG redirect + result notice. `plugin_action_links` adds a link to the Tools page.
 
-- [ ] Step 1: Integration test — reset preserves `hash_salt` (assert equal before/after) + restores other
-  defaults; delete-all yields empty tables + a *different* salt; both reject a missing/invalid nonce or a
-  non-admin or an unchecked confirm.
-- [ ] Step 2: Run → FAIL.
-- [ ] Step 3: Implement.
-- [ ] Step 4: Run → PASS.
-- [ ] Step 5: Live smoke — Playwright: export bundle → delete-all → import bundle restores (the
-  export⇄wipe⇄re-import story). Capture evidence. Commit.
+- [x] Step 1–4: Integration test (`DataLifecycleActionsTest`) — `resetSettings` preserves `hash_salt` +
+  restores other defaults; `deleteAllData` yields empty (recreated) tables + a *different* salt +
+  schema_version='1'. Implemented `ToolsPage::resetSettings`/`deleteAllData` (testable) + guarded
+  `handleReset`/`handleWipe` (cap + `check_admin_referer` + required confirm checkbox + PRG notice) +
+  `plugin_action_links` "Export/Entfernen" link + a JS confirm on delete-all. GREEN (2 tests, 8 assertions).
+- [ ] Step 5: WS4 live smoke (export⇄wipe⇄re-import) — done in the WS4 SECURITY gate below.
+
+**Verify:** `npm run test:integration -- --filter DataLifecycleActions`
+**DoD:** reset keeps salt; delete-all wipes + re-inits with new salt; both fully gated; round-trip works.
+**Evidence:**
+```
+# GREEN -> OK (2 tests, 8 assertions): reset keeps KEEPSALT + resets owner_address/pii_days;
+#   deleteAllData -> new salt (!=OLDSALT), defaults, schema_version=1, table empty+usable.
+# full suites: unit 104, integration 39->41.
+```
 
 **Verify:** integration filter + Playwright smoke.
 **DoD:** reset keeps salt; delete-all wipes + re-inits with new salt; both fully gated; round-trip works.

@@ -11,6 +11,7 @@ use PortoSender\Persistence\SchemaVersion;
 use PortoSender\Portability\ExportService;
 use PortoSender\Portability\ImportService;
 use PortoSender\Portability\BundleCrypto;
+use PortoSender\Lifecycle\DataEraser;
 
 /**
  * "Export & Import" admin page (Werkzeuge): streams per-table CSV and the
@@ -27,6 +28,8 @@ final class ToolsPage
     private const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB import cap
     private const NONCE_EXPORT = 'porto_export';
     private const NONCE_IMPORT = 'porto_import';
+    private const NONCE_RESET = 'porto_reset';
+    private const NONCE_WIPE = 'porto_wipe';
 
     public function __construct(private CodeStore $codes, private RequestStore $requests)
     {
@@ -46,6 +49,8 @@ final class ToolsPage
         });
         add_action('admin_post_porto_export', [$this, 'handleExport']);
         add_action('admin_post_porto_import', [$this, 'handleImport']);
+        add_action('admin_post_porto_reset', [$this, 'handleReset']);
+        add_action('admin_post_porto_wipe', [$this, 'handleWipe']);
     }
 
     // ---------- testable builders ----------
@@ -79,6 +84,33 @@ final class ToolsPage
     public function importResult(string $contents, ?string $passphrase, string $mode): array
     {
         return $this->importer()->importBundle($contents, $passphrase, $mode);
+    }
+
+    /**
+     * Reset the configurable settings to defaults but PRESERVE hash_salt — wiping
+     * the salt would invalidate every existing email/name/token/IP hash.
+     */
+    public function resetSettings(): void
+    {
+        $salt = Settings::fromOption()->hashSalt();
+        $defaults = Settings::defaults();
+        $defaults['hash_salt'] = $salt !== '' ? $salt : wp_generate_password(64, false, false);
+        update_option(Settings::OPTION, $defaults);
+    }
+
+    /**
+     * Delete ALL plugin data and re-initialise an empty install: purge everything,
+     * recreate empty tables, and re-seed defaults with a NEW salt (a clean slate).
+     */
+    public function deleteAllData(): void
+    {
+        global $wpdb;
+        DataEraser::purgeAll($wpdb);
+        Schema::install($wpdb);
+        $defaults = Settings::defaults();
+        $defaults['hash_salt'] = wp_generate_password(64, false, false);
+        update_option(Settings::OPTION, $defaults);
+        (new SchemaVersion())->set(Schema::CURRENT_VERSION);
     }
 
     // ---------- admin-post handlers (thin, guarded) ----------
@@ -133,12 +165,37 @@ final class ToolsPage
             $type = 'error';
         }
 
+        $this->redirectWithNotice($type, $msg);
+    }
+
+    public function handleReset(): void
+    {
+        $this->assertAllowed(self::NONCE_RESET);
+        if (empty($_POST['confirm'])) {
+            $this->redirectWithNotice('error', __('Bitte das Bestätigungsfeld ankreuzen.', 'wp-porto-sender'));
+        }
+        $this->resetSettings();
+        $this->redirectWithNotice('success', __('Einstellungen auf Standard zurückgesetzt (Salt erhalten).', 'wp-porto-sender'));
+    }
+
+    public function handleWipe(): void
+    {
+        $this->assertAllowed(self::NONCE_WIPE);
+        if (empty($_POST['confirm'])) {
+            $this->redirectWithNotice('error', __('Bitte das Bestätigungsfeld ankreuzen.', 'wp-porto-sender'));
+        }
+        $this->deleteAllData();
+        $this->redirectWithNotice('success', __('Alle Plugin-Daten gelöscht und neu initialisiert.', 'wp-porto-sender'));
+    }
+
+    // ---------- helpers ----------
+
+    private function redirectWithNotice(string $type, string $msg): void
+    {
         set_transient('porto_tools_notice_' . get_current_user_id(), ['type' => $type, 'msg' => $msg], 60);
         wp_safe_redirect(admin_url('admin.php?page=porto-sender-tools'));
         exit;
     }
-
-    // ---------- helpers ----------
 
     private function assertAllowed(string $nonceAction): void
     {
@@ -262,6 +319,27 @@ final class ToolsPage
         echo '<p><label>' . esc_html__('Passphrase (falls verschlüsselt)', 'wp-porto-sender')
             . ' <input type="password" name="passphrase" autocomplete="new-password"></label></p>';
         submit_button(__('Importieren', 'wp-porto-sender'));
+        echo '</form>';
+
+        // --- Data lifecycle (reset / delete-all) ---
+        echo '<hr><h2>' . esc_html__('Daten-Lebenszyklus', 'wp-porto-sender') . '</h2>';
+        echo '<p>' . esc_html__('Tipp: Vor dem Entfernen oben ein Backup-Bundle exportieren.', 'wp-porto-sender') . '</p>';
+
+        echo '<form method="post" action="' . $action . '">';
+        wp_nonce_field(self::NONCE_RESET);
+        echo '<input type="hidden" name="action" value="porto_reset">';
+        echo '<p><label><input type="checkbox" name="confirm" value="1"> '
+            . esc_html__('Einstellungen auf Standard zurücksetzen (Codes/Anfragen und Salt bleiben erhalten)', 'wp-porto-sender') . '</label></p>';
+        submit_button(__('Einstellungen zurücksetzen', 'wp-porto-sender'), 'secondary');
+        echo '</form>';
+
+        echo '<form method="post" action="' . $action . '" onsubmit="return confirm(\''
+            . esc_js(__('Wirklich ALLE Plugin-Daten unwiderruflich löschen?', 'wp-porto-sender')) . '\');">';
+        wp_nonce_field(self::NONCE_WIPE);
+        echo '<input type="hidden" name="action" value="porto_wipe">';
+        echo '<p><label><input type="checkbox" name="confirm" value="1"> '
+            . esc_html__('Ja, ALLE Daten (Codes, Anfragen, Einstellungen) unwiderruflich löschen', 'wp-porto-sender') . '</label></p>';
+        submit_button(__('Alle Daten löschen', 'wp-porto-sender'), 'delete');
         echo '</form></div>';
     }
 }

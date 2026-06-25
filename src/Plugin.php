@@ -80,6 +80,12 @@ final class Plugin
             (new CodeIntakePage($codes, $catalog))->register();
             (new Dashboard($codes, $catalog, $s))->register();
             (new ToolsPage($codes, $requests))->register();
+            // Guide the admin to export before removing the plugin (uninstall.php has no UI).
+            add_filter('plugin_action_links_' . plugin_basename(self::$file), static function (array $links): array {
+                $url = admin_url('admin.php?page=porto-sender-tools');
+                array_unshift($links, '<a href="' . esc_url($url) . '">' . esc_html__('Export/Entfernen', 'wp-porto-sender') . '</a>');
+                return $links;
+            });
         }
     }
 

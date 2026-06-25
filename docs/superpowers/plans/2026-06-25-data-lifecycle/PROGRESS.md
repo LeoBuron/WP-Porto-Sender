@@ -2,6 +2,11 @@
 
 **Iteration log (newest first). One line: status + what's next.**
 
+- **2026-06-25 · PHASE B iter 9 — WS4 Task 16 DONE; WS4 code-complete.** ToolsPage reset (preserve salt) /
+  delete-all (purge → recreate → new salt) business methods + guarded handlers (cap+nonce+confirm+PRG) +
+  `plugin_action_links` pre-removal link. Integration 39→41; unit 104; all green.
+  **Next:** WS4 SECURITY REVIEW (destructive actions) + WS4 live smoke (export⇄wipe⇄re-import) → WS4 done,
+  then WS3 (geo) Tasks 17–20.
 - **2026-06-25 · PHASE B iter 8 — WS4 Tasks 14–15 DONE.** (14) `DataEraser::purgeAll` — single purge def
   (tables/options/transients/cron incl. the WS1 notify keys, resolving that deferred low); (15) `uninstall.php`
   now delegates to it (real-file integration test proves zero residue). Two harness fixes: drop WP's
@@ -55,7 +60,7 @@
 ## Workstream status
 - WS2 (portability / spine): **DONE** ✅ — Tasks 1–9 + security review (5 low, 1 fixed/4 deferred) + live DR smoke.
 - WS1 (admin notification): **DONE** ✅ — Tasks 10–13 + security review (1 med fixed, 1 low deferred to WS4).
-- WS4 (uninstall & lifecycle): **in progress** — Tasks 14–15 ✅; Task 16 (reset/delete-all UI) + SEC pending.
+- WS4 (uninstall & lifecycle): **code-complete** — Tasks 14–16 ✅; WS4 SECURITY REVIEW + live smoke pending.
 - WS3 (geo, default-off): not started — Tasks 17–20 + SEC.
 - FINAL stop-condition: pending.
 
