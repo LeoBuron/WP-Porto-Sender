@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.4.0 =
+* Add a "Generieren" button on the settings page to create a strong Altcha HMAC secret (256-bit, in-browser CSPRNG — no data leaves the site).
+* Export: the unencrypted-bundle confirmation is now enforced in the browser (only for the plaintext bundle; CSV and encrypted-bundle exports are unaffected). The server-side check is unchanged.
 
 = 0.3.0 =
 * Add in-place updates from GitHub Releases.

@@ -71,8 +71,15 @@ final class SettingsPage
             'unconfirmed_retention_days' => __('Nie bestätigte Anfragen werden so viele Tage aufbewahrt (für die Betrugs-/Missbrauchsprüfung) und danach gelöscht. Unabhängig von der Token-Gültigkeit — abgelaufene Links funktionieren weiterhin nicht.', 'wp-porto-sender'),
         ];
         foreach ($fields as $key => [$label, $type, $value]) {
-            printf('<p><label>%s<br><input type="%s" name="%s[%s]" value="%s"></label>',
-                esc_html($label), esc_attr($type), esc_attr($opt), esc_attr($key), esc_attr((string) $value));
+            $idAttr = $key === 'altcha_hmac_secret' ? ' id="porto-altcha-secret"' : '';
+            printf('<p><label>%s<br><input type="%s"%s name="%s[%s]" value="%s"></label>',
+                esc_html($label), esc_attr($type), $idAttr, esc_attr($opt), esc_attr($key), esc_attr((string) $value));
+            if ($key === 'altcha_hmac_secret') {
+                printf(' <button type="button" class="button" id="porto-altcha-generate">%s</button>',
+                    esc_html__('Generieren', 'wp-porto-sender'));
+                printf('<br><span class="description">%s</span>',
+                    esc_html__('Erzeugt ein zufälliges 256-Bit-Secret (64 Hex-Zeichen). Danach unten „Änderungen speichern“ klicken. Ohne gesetztes Secret ist die CAPTCHA-Prüfung inaktiv.', 'wp-porto-sender'));
+            }
             if (isset($descriptions[$key])) {
                 printf('<br><span class="description">%s</span>', esc_html($descriptions[$key]));
             }
@@ -129,5 +136,35 @@ final class SettingsPage
         echo '</fieldset>';
         submit_button();
         echo '</form></div>';
+
+        // Client-side secret generator — fills the field using the browser's CSPRNG
+        // (Web Crypto getRandomValues). No server round-trip, so the plugin stays
+        // self-contained and no secret is transmitted; the admin saves via the form.
+        $noCryptoMsg = wp_json_encode(
+            __('Dein Browser unterstützt keine sichere Zufallserzeugung. Bitte trage das Secret manuell ein.', 'wp-porto-sender')
+        );
+        ?>
+        <script>
+        (function () {
+            var btn = document.getElementById('porto-altcha-generate');
+            var field = document.getElementById('porto-altcha-secret');
+            if (!btn || !field) { return; }
+            btn.addEventListener('click', function () {
+                var rng = window.crypto || window.msCrypto;
+                if (!rng || !rng.getRandomValues) {
+                    window.alert(<?php echo $noCryptoMsg; ?>);
+                    return;
+                }
+                var bytes = new Uint8Array(32); // 256 bits of entropy
+                rng.getRandomValues(bytes);
+                field.value = Array.prototype.map.call(bytes, function (b) {
+                    return ('0' + b.toString(16)).slice(-2); // each byte -> 2 hex chars
+                }).join('');
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+                field.focus();
+            });
+        })();
+        </script>
+        <?php
     }
 }

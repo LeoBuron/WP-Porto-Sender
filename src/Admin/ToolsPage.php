@@ -328,7 +328,7 @@ final class ToolsPage
 
         // --- Export ---
         echo '<h2>' . esc_html__('Export', 'wp-porto-sender') . '</h2>';
-        echo '<form method="post" action="' . $action . '">';
+        echo '<form id="porto-export-form" method="post" action="' . $action . '">';
         wp_nonce_field(self::NONCE_EXPORT);
         echo '<input type="hidden" name="action" value="porto_export">';
         echo '<p><label><input type="radio" name="format" value="codes_csv" checked> '
@@ -344,6 +344,33 @@ final class ToolsPage
             . '</label></p>';
         submit_button(__('Exportieren', 'wp-porto-sender'));
         echo '</form>';
+
+        // The confirmation only matters for a *plaintext* bundle, so we can't mark the box
+        // statically required (that would also block CSV and encrypted-bundle exports).
+        // Toggle `required` to match the current selection so the browser blocks submit
+        // natively. The server guard in handleExport() stays the authoritative gate.
+        ?>
+        <script>
+        (function () {
+            var form = document.getElementById('porto-export-form');
+            if (!form) { return; }
+            var confirmBox = form.querySelector('input[name="confirm_plain"]');
+            var passphrase = form.querySelector('input[name="passphrase"]');
+            if (!confirmBox) { return; }
+            function sync() {
+                var format = form.querySelector('input[name="format"]:checked');
+                var plainBundle = format && format.value === 'bundle'
+                    && (!passphrase || passphrase.value.trim() === '');
+                confirmBox.required = plainBundle;
+            }
+            form.querySelectorAll('input[name="format"]').forEach(function (radio) {
+                radio.addEventListener('change', sync);
+            });
+            if (passphrase) { passphrase.addEventListener('input', sync); }
+            sync();
+        })();
+        </script>
+        <?php
 
         // --- Import ---
         echo '<hr><h2>' . esc_html__('Import', 'wp-porto-sender') . '</h2>';
