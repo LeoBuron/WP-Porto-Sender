@@ -56,7 +56,7 @@ final class DataLifecycleActionsTest extends PortoTestCase
         $this->assertNotSame('OLDSALT', $opt['hash_salt']);    // fresh salt
         $this->assertNotSame('', $opt['hash_salt']);
         $this->assertSame('', $opt['owner_address']);          // defaults
-        $this->assertSame('1', get_option(SchemaVersion::OPTION));
+        $this->assertSame(Schema::CURRENT_VERSION, get_option(SchemaVersion::OPTION));
         $this->assertSame(0, $codes->availableCount('standardbrief', new \DateTimeImmutable('now'))); // empty, recreated
     }
 
