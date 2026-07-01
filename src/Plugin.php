@@ -80,7 +80,7 @@ final class Plugin
         if (is_admin()) {
             (new SettingsPage())->register();
             (new CodeIntakePage($codes, $catalog))->register();
-            (new Dashboard($codes, $catalog, $s))->register();
+            (new Dashboard($codes, $s))->register();
             (new ToolsPage($codes, $requests))->register();
             // Guide the admin to export before removing the plugin (uninstall.php has no UI).
             add_filter('plugin_action_links_' . plugin_basename(self::$file), static function (array $links): array {

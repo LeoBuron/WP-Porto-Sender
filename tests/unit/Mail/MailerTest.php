@@ -17,7 +17,7 @@ final class MailerTest extends WpUnitTestCase
             return true;
         });
         $mailer = new Mailer(new Settings(['owner_address' => "Leo Buron\n12345 Musterstadt"]));
-        $product = new PostageProduct('grossbrief', 180, 'Großbrief', 'A4 flach, bis 500 g');
+        $product = new PostageProduct('grossbrief', 'Großbrief', 'A4 flach, bis 500 g');
 
         $this->assertTrue($mailer->sendDelivery('v@example.de', 'Vera', 'AB12CD34', $product));
         $this->assertSame('v@example.de', $captured['to']);

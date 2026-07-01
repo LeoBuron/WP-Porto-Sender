@@ -8,7 +8,7 @@ use PortoSender\Postage\ProductCatalog;
 
 final class CodesCsvImporterTest extends TestCase
 {
-    /** @var array<int,array{product:string,value:int,date:string,codes:array<int,string>}> */
+    /** @var array<int,array{product:string,date:string,codes:array<int,string>}> */
     private array $calls = [];
 
     /** @param array<int,string> $existingCodes codes the (faked) DB already holds */
@@ -17,8 +17,8 @@ final class CodesCsvImporterTest extends TestCase
         $this->calls = [];
         $store = $this->createMock(CodeStore::class);
         $store->method('addBatch')->willReturnCallback(
-            function (string $product, int $value, \DateTimeImmutable $date, array $codes) use ($existingCodes): int {
-                $this->calls[] = ['product' => $product, 'value' => $value, 'date' => $date->format('Y-m-d'), 'codes' => $codes];
+            function (string $product, \DateTimeImmutable $date, array $codes) use ($existingCodes): int {
+                $this->calls[] = ['product' => $product, 'date' => $date->format('Y-m-d'), 'codes' => $codes];
                 $code = (string) ($codes[0] ?? '');
                 return in_array($code, $existingCodes, true) ? 0 : 1; // INSERT IGNORE: dup -> 0
             }
@@ -28,24 +28,26 @@ final class CodesCsvImporterTest extends TestCase
 
     public function test_imports_valid_rows_passing_through_to_addbatch(): void
     {
-        $csv = "product,code,value_cents,purchase_date\n"
-             . "standardbrief,AB12,95,2026-01-15\n"
-             . "grossbrief,CD34,180,2026-02-20\n";
+        $csv = "product,code,purchase_date\n"
+             . "standardbrief,AB12,2026-01-15\n"
+             . "grossbrief,CD34,2026-02-20\n";
         $result = $this->importer()->import($csv);
 
         $this->assertSame(2, $result['inserted']);
         $this->assertSame([], $result['skipped']);
         $this->assertSame('standardbrief', $this->calls[0]['product']);
-        $this->assertSame(95, $this->calls[0]['value']);
         $this->assertSame('2026-01-15', $this->calls[0]['date']);
         $this->assertSame(['AB12'], $this->calls[0]['codes']);
     }
 
-    public function test_value_cents_defaults_to_catalog_when_absent(): void
+    public function test_extra_columns_such_as_value_cents_are_ignored(): void
     {
-        $result = $this->importer()->import("product,code\nstandardbrief,AB12\n");
+        // A legacy export still carrying value_cents must import unharmed: the
+        // column is simply not consumed anymore.
+        $result = $this->importer()->import("product,code,value_cents\nstandardbrief,AB12,95\n");
         $this->assertSame(1, $result['inserted']);
-        $this->assertSame(95, $this->calls[0]['value']);
+        $this->assertSame([], $result['skipped']);
+        $this->assertSame(['AB12'], $this->calls[0]['codes']);
     }
 
     public function test_unknown_product_is_skipped_and_never_hits_store(): void
@@ -64,14 +66,6 @@ final class CodesCsvImporterTest extends TestCase
         $this->assertSame(0, $result['inserted']);
         $this->assertCount(1, $result['skipped']);
         $this->assertStringContainsString('purchase_date', $result['skipped'][0]['reason']);
-    }
-
-    public function test_invalid_value_cents_is_skipped(): void
-    {
-        $result = $this->importer()->import("product,code,value_cents\nstandardbrief,AB12,abc\n");
-        $this->assertSame(0, $result['inserted']);
-        $this->assertCount(1, $result['skipped']);
-        $this->assertStringContainsString('value_cents', $result['skipped'][0]['reason']);
     }
 
     public function test_empty_code_is_skipped(): void

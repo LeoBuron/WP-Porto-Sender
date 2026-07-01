@@ -26,7 +26,7 @@ final class DataEraserTest extends PortoTestCase
     public function test_purge_all_removes_tables_options_transients_and_cron(): void
     {
         global $wpdb;
-        (new CodeRepository($wpdb))->addBatch('standardbrief', 95, new \DateTimeImmutable('2026-01-15'), ['ERASE1']);
+        (new CodeRepository($wpdb))->addBatch('standardbrief', new \DateTimeImmutable('2026-01-15'), ['ERASE1']);
         // Seed a PII-bearing request — the whole point of a DSGVO purge is to drop this table.
         (new RequestRepository($wpdb))->createPending([
             'name' => 'Erase Me', 'email' => 'erase@example.test', 'email_hash' => 'eh', 'name_hash' => 'nh',

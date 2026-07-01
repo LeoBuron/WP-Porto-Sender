@@ -12,7 +12,8 @@ namespace PortoSender\Persistence;
  * changes dbDelta cannot express — data backfills, drops/renames, transforms —
  * applying the steps strictly between the recorded version and CURRENT_VERSION.
  *
- * The current schema is the v1 baseline; the built-in migration map is empty.
+ * The current schema is v2; the migration map holds the steps dbDelta cannot
+ * express (e.g. the v2 drop of the obsolete value_cents column).
  */
 final class SchemaVersion
 {
@@ -63,13 +64,15 @@ final class SchemaVersion
         $from = $this->current();
 
         if ($from === '') {
-            // First time a version is recorded. dbDelta has just brought a fresh
-            // install straight to CURRENT, and a legacy pre-versioning install is
-            // at the v1 baseline — neither needs a migration up to v1. When
-            // CURRENT advances past the baseline, add fresh-vs-legacy detection
-            // here before running baseline->CURRENT migrations.
-            $this->set($to);
-            return;
+            // No version recorded yet: either a fresh install (dbDelta has just
+            // built every table at CURRENT) or a legacy pre-versioning install
+            // sitting at the old baseline. We cannot tell them apart from the
+            // option alone, so run the whole baseline->CURRENT migration range
+            // and rely on each step being self-guarding: the value_cents drop,
+            // for instance, checks the column exists first, so on a fresh install
+            // (where CURRENT already holds) it is a no-op, while a legacy install
+            // converges. '0' is a sentinel below every migration key.
+            $from = '0';
         }
 
         if ($from === $to) {
@@ -81,13 +84,26 @@ final class SchemaVersion
     }
 
     /**
-     * The built-in migration map. Empty at the v1 baseline; future schema
-     * changes register their step here, keyed by the version they produce.
+     * The built-in migration map, keyed by the version each step produces.
+     * Future schema changes register their step here.
      *
      * @return array<string,callable>
      */
     private function migrations(\wpdb $wpdb): array
     {
-        return [];
+        return [
+            // v2: drop the obsolete per-code postage value column. The "codes
+            // below postage value" warning it powered was removed in 0.5.0, and
+            // issuance never ordered by value, so the data has no operational
+            // use. Guarded by a column check so it no-ops on fresh installs,
+            // whose CREATE TABLE already omits the column.
+            '2' => static function () use ($wpdb): void {
+                $codes = Schema::codesTable($wpdb);
+                $exists = $wpdb->get_var("SHOW COLUMNS FROM `{$codes}` LIKE 'value_cents'");
+                if ($exists) {
+                    $wpdb->query("ALTER TABLE `{$codes}` DROP COLUMN value_cents");
+                }
+            },
+        ];
     }
 }

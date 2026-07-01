@@ -25,7 +25,7 @@ final class GeoBlockedResponseTest extends PortoTestCase
         global $wpdb;
         $codes = new CodeRepository($wpdb);
         $requests = new RequestRepository($wpdb);
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['GEOCODE_' . substr(md5((string) $settings->geoProvider() . $settings->geoEnabled()), 0, 5)]);
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['GEOCODE_' . substr(md5((string) $settings->geoProvider() . $settings->geoEnabled()), 0, 5)]);
         return new IssuanceService(
             new NullVerifier(), new RequestLimiter($requests),
             new RateLimiter(new TransientRateCounterStore(), $settings, new SystemClock()),

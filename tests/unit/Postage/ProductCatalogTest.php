@@ -6,11 +6,11 @@ use PortoSender\Postage\ProductCatalog;
 
 final class ProductCatalogTest extends TestCase
 {
-    public function test_known_products_and_prices(): void
+    public function test_known_products_and_labels(): void
     {
         $c = ProductCatalog::default();
-        $this->assertSame(95, $c->get('standardbrief')->valueCents);
-        $this->assertSame(180, $c->get('grossbrief')->valueCents);
+        $this->assertSame('Standardbrief', $c->get('standardbrief')->label);
+        $this->assertSame('Großbrief', $c->get('grossbrief')->label);
         $this->assertNull($c->get('nope'));
     }
 

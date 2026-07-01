@@ -16,7 +16,7 @@ final class ExportServiceTest extends PortoTestCase
         $codes = new CodeRepository($wpdb);
         $requests = new RequestRepository($wpdb);
 
-        $codes->addBatch('standardbrief', 95, new \DateTimeImmutable('2026-01-15'), ['EXPORTME1']);
+        $codes->addBatch('standardbrief', new \DateTimeImmutable('2026-01-15'), ['EXPORTME1']);
         $requests->createPending([
             'name' => 'Alice', 'email' => 'alice@example.test',
             'email_hash' => 'eh', 'name_hash' => 'nh', 'product' => 'standardbrief',

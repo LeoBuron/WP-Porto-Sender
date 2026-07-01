@@ -14,7 +14,7 @@ final class ToolsPageExportImportTest extends PortoTestCase
 {
     private function seed(CodeRepository $codes, RequestRepository $requests): void
     {
-        $codes->addBatch('standardbrief', 95, new \DateTimeImmutable('2026-01-15'), ['TOOLS1', 'TOOLS2']);
+        $codes->addBatch('standardbrief', new \DateTimeImmutable('2026-01-15'), ['TOOLS1', 'TOOLS2']);
         $requests->createPending([
             'name' => 'Bob', 'email' => 'bob@example.test',
             'email_hash' => 'eh', 'name_hash' => 'nh', 'product' => 'standardbrief',
@@ -94,7 +94,7 @@ final class ToolsPageExportImportTest extends PortoTestCase
         $page = new CodeIntakePage($codes, ProductCatalog::default());
 
         $tmp = tempnam(sys_get_temp_dir(), 'portocsv');
-        file_put_contents($tmp, "product,code,value_cents\nstandardbrief,CSVA,95\nnope,CSVB,95\nstandardbrief,CSVA,95\n");
+        file_put_contents($tmp, "product,code\nstandardbrief,CSVA\nnope,CSVB\nstandardbrief,CSVA\n");
         try {
             $result = $page->importCsvFile($tmp);
         } finally {

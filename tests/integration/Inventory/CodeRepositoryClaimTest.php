@@ -12,8 +12,8 @@ final class CodeRepositoryClaimTest extends PortoTestCase
     public function test_claims_oldest_first_and_never_twice(): void
     {
         $now = new \DateTimeImmutable('2026-06-24 10:00:00');
-        $this->repo->addBatch('grossbrief', 180, new \DateTimeImmutable('2025-01-01'), ['OLD']);
-        $this->repo->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['NEW']);
+        $this->repo->addBatch('grossbrief', new \DateTimeImmutable('2025-01-01'), ['OLD']);
+        $this->repo->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['NEW']);
         $first = $this->repo->claimOne('grossbrief', $now, 30);
         $this->assertSame('OLD', $this->repo->getCode($first)->code);
         $second = $this->repo->claimOne('grossbrief', $now, 30);
@@ -24,20 +24,20 @@ final class CodeRepositoryClaimTest extends PortoTestCase
     public function test_does_not_claim_expired(): void
     {
         $now = new \DateTimeImmutable('2026-06-24 10:00:00');
-        $this->repo->addBatch('standardbrief', 95, new \DateTimeImmutable('2020-01-01'), ['EXP']); // expires 2023-12-31
+        $this->repo->addBatch('standardbrief', new \DateTimeImmutable('2020-01-01'), ['EXP']); // expires 2023-12-31
         $this->assertNull($this->repo->claimOne('standardbrief', $now, 30));
     }
 
     public function test_mark_issued_and_release_stale(): void
     {
         $now = new \DateTimeImmutable('2026-06-24 10:00:00');
-        $this->repo->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['X']);
+        $this->repo->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['X']);
         $id = $this->repo->claimOne('grossbrief', $now, 30);
         $this->assertTrue($this->repo->markIssued($id, 1, str_repeat('a', 64), $now));
         $this->assertSame('issued', $this->repo->getCode($id)->status);
 
         // a second code reserved then made stale
-        $this->repo->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['Y']);
+        $this->repo->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['Y']);
         $id2 = $this->repo->claimOne('grossbrief', $now, 30);
         $GLOBALS['wpdb']->update($GLOBALS['wpdb']->prefix . 'porto_codes',
             ['reserved_until' => '2026-06-24 09:00:00'], ['id' => $id2]);

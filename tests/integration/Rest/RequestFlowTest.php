@@ -41,7 +41,7 @@ final class RequestFlowTest extends PortoTestCase
         add_filter('pre_wp_mail', '__return_true');
 
         [$svc, $codes, $requests] = $this->service();
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['POOLCODE1']);
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['POOLCODE1']);
 
         // Seed a pending request with a known token (mirrors what submit() stores).
         $hasher = new Hasher('salt');
@@ -68,7 +68,7 @@ final class RequestFlowTest extends PortoTestCase
         add_filter('pre_wp_mail', '__return_false');
 
         [$svc, $codes, $requests] = $this->service();
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['POOLCODE2']);
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['POOLCODE2']);
 
         $hasher = new Hasher('salt');
         $reqId = $requests->createPending([
@@ -88,7 +88,7 @@ final class RequestFlowTest extends PortoTestCase
     public function test_rest_submit_creates_pending_request(): void
     {
         [$svc, $codes] = $this->service();
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['RESTCODE1']);
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['RESTCODE1']);
         $controller = new \PortoSender\Rest\RestController($svc, new NullVerifier());
         $controller->register();
         global $wp_rest_server;
@@ -105,7 +105,7 @@ final class RequestFlowTest extends PortoTestCase
     {
         $_SERVER['REMOTE_ADDR'] = '203.0.113.5';
         [$svc, $codes] = $this->service(); // default settings => 3/day per IP
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['RLCODE1']);
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['RLCODE1']);
         $controller = new \PortoSender\Rest\RestController($svc, new NullVerifier());
         $controller->register();
         global $wp_rest_server;
