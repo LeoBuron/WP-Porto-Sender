@@ -14,6 +14,7 @@ final class GeoSettingsTest extends WpUnitTestCase
         \Brain\Monkey\Functions\when('sanitize_email')->returnArg(1);
         \Brain\Monkey\Functions\when('esc_url_raw')->returnArg(1);
         \Brain\Monkey\Functions\when('absint')->alias(static fn($v) => abs((int) $v));
+        \Brain\Monkey\Functions\when('sanitize_hex_color')->alias(static fn($c) => preg_match('/^#[0-9a-fA-F]{6}$/', (string) $c) ? $c : null);
     }
 
     public function test_defaults_are_off_and_safe(): void
