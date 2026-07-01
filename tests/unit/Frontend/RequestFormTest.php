@@ -16,6 +16,7 @@ final class RequestFormTest extends WpUnitTestCase
         Functions\when('esc_html')->returnArg(1);
         Functions\when('esc_url')->returnArg(1);
         Functions\when('rest_url')->alias(fn($p) => 'https://x.test/wp-json/' . $p);
+        Functions\when('sanitize_hex_color')->alias(fn($c) => preg_match('/^#[0-9a-fA-F]{6}$/', (string) $c) ? $c : null);
         // data-sent-url plumbing (added in Task 7).
         Functions\when('home_url')->alias(fn($p = '') => 'https://x.test' . $p);
         Functions\when('get_permalink')->alias(fn($id) => 'https://x.test/seite-' . $id);
@@ -84,6 +85,19 @@ final class RequestFormTest extends WpUnitTestCase
         $this->assertStringContainsString('Porto-Code anfordern', $html);
         $this->assertStringContainsString('--porto-accent:#0b5fff', $html);
         $this->assertStringContainsString('--porto-max-width:520px', $html);
+    }
+
+    public function test_malicious_colour_cannot_break_out_of_style(): void
+    {
+        // A colour that reached the option without Settings::sanitize() (e.g. a tampered
+        // import bundle) must be neutralised at the output sink, not executed as markup.
+        $form = new RequestForm(ProductCatalog::default(), new Settings([
+            'form_accent_color' => '}</style><script>alert(1)</script><style>{',
+        ]));
+        $html = $form->render([]);
+
+        $this->assertStringNotContainsString('<script>alert(1)', $html);
+        $this->assertStringContainsString('--porto-accent:#0b5fff', $html); // fell back to preset
     }
 
     public function test_render_zero_max_width_means_full_width(): void

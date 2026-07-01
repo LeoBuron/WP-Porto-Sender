@@ -79,6 +79,10 @@ final class Plugin
         (new Maintenance($codes, $requests, $alerter, $s, new SystemClock()))->register();
 
         if (is_admin()) {
+            // WordPress does not fire the activation hook on auto-update (this plugin's
+            // update path via GitHub Releases), so run any pending schema migration on the
+            // first admin load after an update. run() is version-gated → no-op once current.
+            (new SchemaVersion())->run($wpdb);
             (new SettingsPage())->register();
             (new CodeIntakePage($codes, $catalog))->register();
             (new Dashboard($codes, $s))->register();

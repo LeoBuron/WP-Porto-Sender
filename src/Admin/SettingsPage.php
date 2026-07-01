@@ -253,7 +253,7 @@ final class SettingsPage
             ));
             printf('<p class="description">%s %s</p>', esc_html__('Platzhalter:', 'wp-porto-sender'), $codes);
             if ($key === 'admin') {
-                printf('<p class="description">%s</p>', esc_html__('%name% und %email% werden nur eingesetzt, wenn oben „Name und E-Mail mitsenden" aktiviert ist – sonst bleiben sie leer.', 'wp-porto-sender'));
+                printf('<p class="description">%s</p>', esc_html__('%name% und %email% werden nur eingesetzt, wenn im Tab „Missbrauchsschutz" die Option „Name und E-Mail mitsenden" aktiviert ist – sonst bleiben sie leer.', 'wp-porto-sender'));
             }
             echo '</fieldset>';
         }

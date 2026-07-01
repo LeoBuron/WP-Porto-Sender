@@ -27,16 +27,19 @@ final class RequestForm
         $layout = $this->settings->formLayout();
         $intro = $this->settings->text('text_intro');
 
-        // Scoped custom properties driving assets/porto-form.css. Colours are already
-        // hex-sanitised by Settings::sanitize() (defence against CSS injection) and the
-        // sizes are integers, so the value string is safe to emit inside <style>.
+        // Scoped custom properties driving assets/porto-form.css. Escape at THIS sink:
+        // re-validate each colour to a #RRGGBB literal (fallback to the preset) so a value
+        // that reached the option WITHOUT Settings::sanitize() — e.g. a tampered, plaintext
+        // import bundle whose settings are key-whitelisted but not value-validated — can
+        // never break out of the <style> element. Sizes are integers.
         // form_max_width_px = 0 means "no limit" → max-width: none (full width).
         $maxWidth = $this->settings->formMaxWidthPx();
+        $accent  = sanitize_hex_color($this->settings->formAccentColor()) ?: '#0b5fff';
+        $btnBg   = sanitize_hex_color($this->settings->formButtonBg()) ?: '#0b5fff';
+        $btnText = sanitize_hex_color($this->settings->formButtonText()) ?: '#ffffff';
         $styleVars = sprintf(
             '--porto-accent:%s;--porto-btn-bg:%s;--porto-btn-text:%s;--porto-max-width:%s;--porto-gap:%dpx',
-            $this->settings->formAccentColor(),
-            $this->settings->formButtonBg(),
-            $this->settings->formButtonText(),
+            $accent, $btnBg, $btnText,
             $maxWidth > 0 ? $maxWidth . 'px' : 'none',
             $this->settings->formFieldGapPx()
         );

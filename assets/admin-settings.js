@@ -36,12 +36,22 @@
         });
     }
 
+    // Persist the active tab so it survives the options.php Save round-trip (which drops
+    // the URL fragment). sessionStorage is per-tab and cleared when the tab closes.
+    function remember(slug) {
+        try { window.sessionStorage.setItem('porto-active-tab', slug); } catch (e) {}
+    }
+    function read() {
+        try { return window.sessionStorage.getItem('porto-active-tab') || ''; } catch (e) { return ''; }
+    }
+
     if (links.length && panels.length) {
         links.forEach(function (link) {
             link.addEventListener('click', function (event) {
                 event.preventDefault();
                 var slug = link.getAttribute('data-porto-tab');
                 activate(slug);
+                remember(slug);
                 if (window.history && typeof window.history.replaceState === 'function') {
                     window.history.replaceState(null, '', '#porto-tab-' + slug);
                 } else {
@@ -50,10 +60,13 @@
             });
         });
 
-        // Restore the last tab from the URL hash (e.g. after "Save" reloads the page).
+        // Restore the last tab. The URL hash survives a manual reload; the options.php
+        // Save round-trip drops the fragment, so fall back to sessionStorage (same tab).
         var fromHash = window.location.hash.replace(/^#porto-tab-/, '');
-        if (fromHash && hasTab(fromHash)) {
-            activate(fromHash);
+        var stored = read();
+        var initial = (fromHash && hasTab(fromHash)) ? fromHash : (stored && hasTab(stored) ? stored : '');
+        if (initial) {
+            activate(initial);
         }
     }
 

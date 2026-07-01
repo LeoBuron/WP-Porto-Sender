@@ -20,6 +20,7 @@ final class BlockRegistrarTest extends WpUnitTestCase
         Functions\when('esc_html')->returnArg(1);
         Functions\when('esc_url')->returnArg(1);
         Functions\when('rest_url')->alias(fn($p) => 'https://x.test/' . $p);
+        Functions\when('sanitize_hex_color')->alias(fn($c) => preg_match('/^#[0-9a-fA-F]{6}$/', (string) $c) ? $c : null);
         // RequestForm::render() now builds a data-sent-url (Task 7).
         Functions\when('home_url')->alias(fn($p = '') => 'https://x.test' . $p);
         Functions\when('get_post_status')->justReturn(false);
