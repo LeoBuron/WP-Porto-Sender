@@ -112,6 +112,20 @@ final class IssuanceService
             return ['status' => 'expired'];
         }
 
+        // One porto per person: if this identity already received a code through ANOTHER
+        // request, refuse — even though this token is otherwise valid. Closes the loophole
+        // where a visitor submits several times (several pending confirmation links) and
+        // clicks each to collect multiple codes for the same email/name. Only 'issued'
+        // counts, so a stuck 'confirmed' request (out-of-stock/email-failed) never blocks.
+        $mode = $this->settings->requestLimitMode();
+        if ($mode !== 'none') {
+            $emailHash = $mode === 'name' ? null : (isset($req->email_hash) ? (string) $req->email_hash : null);
+            $nameHash  = $mode === 'email' ? null : (isset($req->name_hash) ? (string) $req->name_hash : null);
+            if ($this->requests->hasIssuedForIdentity($emailHash, $nameHash, (int) $req->id)) {
+                return ['status' => 'already_issued'];
+            }
+        }
+
         $this->requests->markConfirmed((int) $req->id, $now); // no-op if already confirmed
 
         $codeId = null;

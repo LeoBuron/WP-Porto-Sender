@@ -129,10 +129,13 @@ final class ToolsPage
         $format = isset($_POST['format']) ? sanitize_key((string) wp_unslash($_POST['format'])) : 'codes_csv';
         $passphrase = isset($_POST['passphrase']) ? (string) wp_unslash($_POST['passphrase']) : '';
 
-        // An unencrypted bundle carries the secret salt + PII -> require explicit confirmation.
-        if ($format === 'bundle' && $passphrase === '' && empty($_POST['confirm_plain'])) {
+        // Any UNENCRYPTED export of personal data requires explicit confirmation: the
+        // plaintext bundle (secret salt + PII) and the requests CSV (PII). An encrypted
+        // bundle (passphrase set) and the codes CSV (no PII) do not.
+        $needsPlainConfirm = $format === 'requests_csv' || ($format === 'bundle' && $passphrase === '');
+        if ($needsPlainConfirm && empty($_POST['confirm_plain'])) {
             wp_die(
-                esc_html__('An unencrypted bundle contains the secret salt and personal data. Set a passphrase or tick the confirmation box.', 'wp-porto-sender'),
+                esc_html__('This export contains personal data in clear text (the unencrypted bundle also contains the secret salt). Tick the confirmation box to proceed, or set a passphrase to encrypt the bundle.', 'wp-porto-sender'),
                 '',
                 ['response' => 400]
             );
@@ -340,7 +343,7 @@ final class ToolsPage
         echo '<p><label>' . esc_html__('Passphrase für Bundle-Verschlüsselung (optional)', 'wp-porto-sender')
             . ' <input type="password" name="passphrase" autocomplete="new-password"></label></p>';
         echo '<p><label><input type="checkbox" name="confirm_plain" value="1"> '
-            . esc_html__('Mir ist bewusst, dass ein unverschlüsseltes Bundle den geheimen Salt und personenbezogene Daten enthält.', 'wp-porto-sender')
+            . esc_html__('Mir ist bewusst, dass dieser Export personenbezogene Daten im Klartext enthält (beim unverschlüsselten Bundle zusätzlich den geheimen Salt).', 'wp-porto-sender')
             . '</label></p>';
         submit_button(__('Exportieren', 'wp-porto-sender'));
         echo '</form>';
@@ -359,9 +362,11 @@ final class ToolsPage
             if (!confirmBox) { return; }
             function sync() {
                 var format = form.querySelector('input[name="format"]:checked');
-                var plainBundle = format && format.value === 'bundle'
-                    && (!passphrase || passphrase.value.trim() === '');
-                confirmBox.required = plainBundle;
+                var value = format ? format.value : '';
+                var noPass = !passphrase || passphrase.value.trim() === '';
+                // Require confirmation for any unencrypted personal-data export:
+                // the requests CSV (always) and the plaintext bundle (no passphrase).
+                confirmBox.required = value === 'requests_csv' || (value === 'bundle' && noPass);
             }
             form.querySelectorAll('input[name="format"]').forEach(function (radio) {
                 radio.addEventListener('change', sync);

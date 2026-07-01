@@ -10,6 +10,8 @@ interface RequestStore
     public function markConfirmed(int $id, \DateTimeImmutable $now): bool;
     public function markIssued(int $id, int $codeId, \DateTimeImmutable $now): bool;
     public function hasPriorRequest(?string $emailHash, ?string $nameHash): bool;
+    /** Has any OTHER request (id != $excludeId) for this identity already been ISSUED a code? */
+    public function hasIssuedForIdentity(?string $emailHash, ?string $nameHash, int $excludeId): bool;
     /** Purge never-confirmed (pending) requests created before $cutoff — the unconfirmed-retention window. */
     public function deleteUnconfirmedOlderThan(\DateTimeImmutable $cutoff): int;
     public function anonymizeOlderThan(\DateTimeImmutable $cutoff): int;

@@ -99,6 +99,20 @@ final class RequestRepository implements RequestStore
         return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$args)) > 0;
     }
 
+    public function hasIssuedForIdentity(?string $emailHash, ?string $nameHash, int $excludeId): bool
+    {
+        $clauses = [];
+        $args = [];
+        if ($emailHash !== null) { $clauses[] = 'email_hash=%s'; $args[] = $emailHash; }
+        if ($nameHash !== null) { $clauses[] = 'name_hash=%s'; $args[] = $nameHash; }
+        if ($clauses === []) { return false; }
+        // Placeholder order matters: identity clauses (%s) first, then the id (%d) last.
+        $args[] = $excludeId;
+        $sql = "SELECT COUNT(*) FROM {$this->table()} WHERE status='issued' AND ("
+            . implode(' OR ', $clauses) . ') AND id<>%d';
+        return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$args)) > 0;
+    }
+
     public function deleteUnconfirmedOlderThan(\DateTimeImmutable $cutoff): int
     {
         return (int) $this->wpdb->query($this->wpdb->prepare(

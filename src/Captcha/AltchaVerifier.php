@@ -30,7 +30,11 @@ final class AltchaVerifier implements CaptchaVerifier
     private Altcha $altcha;
     private Pbkdf2 $algorithm;
 
-    public function __construct(string $hmacSecret, private int $cost = 100000)
+    // cost = PBKDF2 iterations PER solve attempt. Combined with the 1-byte target prefix
+    // (~256 attempts), the browser's total work is ~256 * cost HMAC-SHA256 ops. 100000 was
+    // too heavy for phones (the widget never finished solving -> captcha_failed); 10000
+    // keeps a real proof-of-work while staying solvable in ~1s on mobile.
+    public function __construct(string $hmacSecret, private int $cost = 10000)
     {
         $this->altcha = new Altcha(hmacSignatureSecret: $hmacSecret);
         $this->algorithm = new Pbkdf2();

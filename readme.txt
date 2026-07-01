@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,12 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.4.1 =
+* Request form: show a processing state on submit (disabled button + status text) and block double submits.
+* Fix: one porto per person is now enforced at confirmation time — extra confirmation links for someone who already received a code no longer issue further codes.
+* Export: the confirmation checkbox is now also required for the unencrypted requests CSV (personal data), not only the backup bundle.
+* Captcha: fix verification failing on smartphones — the proof-of-work was too heavy for phones. Lowered the PBKDF2 cost and the widget now solves automatically while the form is filled; the form waits if the solution isn't ready yet, and shows a clear message if the page is ever opened without HTTPS.
 
 = 0.4.0 =
 * Add a "Generieren" button on the settings page to create a strong Altcha HMAC secret (256-bit, in-browser CSPRNG — no data leaves the site).

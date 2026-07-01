@@ -36,7 +36,7 @@ final class RequestForm
         <?php echo esc_html($p->label . ' – ' . $p->limits); ?></label><br>
     <?php endforeach; ?>
   </fieldset>
-  <altcha-widget challenge="<?php echo esc_attr($challengeUrl); ?>"></altcha-widget>
+  <altcha-widget challenge="<?php echo esc_attr($challengeUrl); ?>" auto="onfocus"></altcha-widget>
   <p><label><input type="checkbox" name="porto_consent" required>
     <?php echo esc_html__('Ich bin einverstanden, dass mein Name und meine E-Mail zur Zusendung des Codes verarbeitet werden.', 'wp-porto-sender'); ?>
     <?php if ($privacy !== ''): ?><a href="<?php echo esc_url($privacy); ?>" target="_blank"><?php echo esc_html__('Datenschutz', 'wp-porto-sender'); ?></a><?php endif; ?>

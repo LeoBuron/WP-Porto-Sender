@@ -28,7 +28,7 @@ final class AltchaVerifierTest extends TestCase
     /**
      * Round-trip: solve a real challenge and assert verify() returns true.
      *
-     * Uses cost=1000 for speed in tests while production defaults to 100000.
+     * Uses cost=1000 for speed in tests while production defaults to 10000.
      */
     public function test_verify_returns_true_for_genuinely_solved_challenge(): void
     {

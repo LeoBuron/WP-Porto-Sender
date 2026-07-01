@@ -74,6 +74,7 @@ final class IssuanceConfirmTest extends MockeryTestCase
             'id' => 42, 'status' => 'pending', 'product' => 'grossbrief', 'email' => 'v@e.de',
             'name' => 'Vera', 'email_hash' => 'EHASH', 'created_at' => '2026-06-24 09:30:00',
         ]);
+        $requests->shouldReceive('hasIssuedForIdentity')->andReturn(false);
         $requests->shouldReceive('markConfirmed')->once()->andReturn(true);
         $requests->shouldReceive('markIssued')->once()->with(42, 7, Mockery::type(\DateTimeImmutable::class))->andReturn(true);
         $codes = Mockery::mock(CodeStore::class);
@@ -95,6 +96,7 @@ final class IssuanceConfirmTest extends MockeryTestCase
             'id' => 42, 'status' => 'pending', 'product' => 'grossbrief', 'email' => 'v@e.de',
             'name' => 'Vera', 'email_hash' => 'EHASH', 'created_at' => '2026-06-24 09:30:00',
         ]);
+        $requests->shouldReceive('hasIssuedForIdentity')->andReturn(false);
         $requests->shouldReceive('markConfirmed')->once()->andReturn(true);
         $requests->shouldNotReceive('markIssued');
         $codes = Mockery::mock(CodeStore::class);
@@ -114,6 +116,7 @@ final class IssuanceConfirmTest extends MockeryTestCase
             'id' => 42, 'status' => 'confirmed', 'product' => 'grossbrief', 'email' => 'v@e.de',
             'name' => 'Vera', 'email_hash' => 'EHASH', 'created_at' => '2026-06-24 09:30:00',
         ]);
+        $requests->shouldReceive('hasIssuedForIdentity')->andReturn(false);
         $requests->shouldReceive('markConfirmed')->andReturn(false); // already confirmed
         $codes = Mockery::mock(CodeStore::class);
         $codes->shouldReceive('claimOne')->times(3)->andReturn(null);
@@ -126,6 +129,25 @@ final class IssuanceConfirmTest extends MockeryTestCase
         $requests = Mockery::mock(RequestStore::class);
         $requests->shouldReceive('findByTokenHash')->andReturn((object) ['id' => 42, 'status' => 'issued']);
         $svc = $this->service(Mockery::mock(CodeStore::class), $requests, Mockery::mock(MailerInterface::class));
+        $this->assertSame('already_issued', $svc->confirm('t')['status']);
+    }
+
+    public function test_confirm_refuses_when_identity_already_got_a_code_elsewhere(): void
+    {
+        // A SECOND valid confirmation link for an identity that already received a porto
+        // (via another request) must not issue another code. Guards the multi-link loophole:
+        // it must bail out BEFORE confirming or claiming a code.
+        $requests = Mockery::mock(RequestStore::class);
+        $requests->shouldReceive('findByTokenHash')->andReturn((object) [
+            'id' => 43, 'status' => 'pending', 'product' => 'grossbrief', 'email' => 'v@e.de',
+            'name' => 'Vera', 'email_hash' => 'EHASH', 'name_hash' => 'NHASH',
+            'created_at' => '2026-06-24 09:30:00',
+        ]);
+        $requests->shouldReceive('hasIssuedForIdentity')->once()->with('EHASH', 'NHASH', 43)->andReturn(true);
+        $requests->shouldNotReceive('markConfirmed');
+        $codes = Mockery::mock(CodeStore::class);
+        $codes->shouldNotReceive('claimOne');
+        $svc = $this->service($codes, $requests, Mockery::mock(MailerInterface::class));
         $this->assertSame('already_issued', $svc->confirm('t')['status']);
     }
 }
