@@ -16,7 +16,7 @@ use PortoSender\Notifications\{AdminNotifier, WpNotifyThrottleStore};
 use PortoSender\Geo\{GeoGate, GeoProviderFactory};
 use PortoSender\Issuance\{IssuanceService, UrlConfirmLinkBuilder};
 use PortoSender\Rest\RestController;
-use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar};
+use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar, PageRenderer};
 use PortoSender\Admin\{SettingsPage, CodeIntakePage, Dashboard, ToolsPage};
 use PortoSender\Cron\Maintenance;
 
@@ -69,7 +69,8 @@ final class Plugin
         add_action('wp_enqueue_scripts', [$form, 'enqueueAssets']);
 
         (new RestController($issuance, self::captcha($s)))->register();
-        (new ConfirmHandler($issuance))->register();
+        (new ConfirmHandler($issuance, $s))->register();
+        (new PageRenderer($s))->register();
         (new BlockRegistrar($form))->register();
 
         $codes = new CodeRepository($wpdb);

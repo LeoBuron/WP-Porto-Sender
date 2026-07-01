@@ -57,7 +57,7 @@ final class RequestFlowTest extends PortoTestCase
         $this->assertSame(0, $codes->availableCount('grossbrief', new \DateTimeImmutable('now')));
 
         // ConfirmHandler delegates to the service.
-        $handler = new ConfirmHandler($svc);
+        $handler = new ConfirmHandler($svc, new Settings(['enabled_products' => ['grossbrief']]));
         $this->assertSame('already_issued', $handler->process('KNOWNTOKEN'));
     }
 

@@ -20,6 +20,10 @@ final class BlockRegistrarTest extends WpUnitTestCase
         Functions\when('esc_html')->returnArg(1);
         Functions\when('esc_url')->returnArg(1);
         Functions\when('rest_url')->alias(fn($p) => 'https://x.test/' . $p);
+        // RequestForm::render() now builds a data-sent-url (Task 7).
+        Functions\when('home_url')->alias(fn($p = '') => 'https://x.test' . $p);
+        Functions\when('get_post_status')->justReturn(false);
+        Functions\when('add_query_arg')->alias(fn($k, $v = null, $u = null) => $u . '?' . $k . '=' . $v);
         $form = new RequestForm(ProductCatalog::default(), new Settings(['enabled_products' => ['grossbrief']]));
         (new BlockRegistrar($form))->register();
         $this->assertIsCallable($captured['render_callback']);

@@ -52,6 +52,12 @@ document.querySelectorAll('.porto-request-form').forEach((form) => {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+      // On success, navigate (GET) to the "check your e-mail" page so a reload can
+      // never re-POST this request. Falls back to the inline message if no URL is set.
+      if (data.status === 'confirmation_sent' && form.dataset.sentUrl) {
+        window.location.assign(form.dataset.sentUrl);
+        return;
+      }
       const messages = {
         confirmation_sent: 'Bitte bestätige die Anfrage über den Link in deiner E-Mail.',
         duplicate: 'Du hast bereits einen Code angefordert.',

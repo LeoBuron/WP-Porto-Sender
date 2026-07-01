@@ -44,6 +44,30 @@ final class AdminNotificationMailTest extends WpUnitTestCase
         $this->assertStringContainsString('Anfrage von: Vera <vera@example.de>', $c['body']);
     }
 
+    public function test_custom_template_resolves_pii_placeholders_when_present(): void
+    {
+        $mailer = new Mailer(new Settings([
+            'email_admin_subject' => 'Abruf: %product%',
+            'email_admin_body' => 'P:%product% C:%count% R:%remaining% N:%name% E:%email%',
+        ]));
+        $c = $this->capture(fn() => $mailer->sendAdminNotification('admin@example.de', [
+            'product_label' => 'Standardbrief', 'count' => 2, 'remaining' => 7, 'name' => 'Vera', 'email' => 'vera@example.de',
+        ]));
+        $this->assertSame('Abruf: Standardbrief', $c['subject']);
+        $this->assertSame('P:Standardbrief C:2 R:7 N:Vera E:vera@example.de', $c['body']);
+    }
+
+    public function test_custom_template_pii_placeholders_empty_when_pii_off(): void
+    {
+        $mailer = new Mailer(new Settings([
+            'email_admin_body' => 'P:%product% C:%count% R:%remaining% N:%name% E:%email%',
+        ]));
+        $c = $this->capture(fn() => $mailer->sendAdminNotification('admin@example.de', [
+            'product_label' => 'Standardbrief', 'count' => 2, 'remaining' => 7, 'name' => null, 'email' => null,
+        ]));
+        $this->assertSame('P:Standardbrief C:2 R:7 N: E:', $c['body']);
+    }
+
     public function test_returns_wp_mail_result(): void
     {
         Functions\expect('wp_mail')->once()->andReturn(false);
