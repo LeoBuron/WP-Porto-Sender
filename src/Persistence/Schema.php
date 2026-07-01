@@ -8,7 +8,7 @@ final class Schema
     public const REQUESTS = 'porto_requests';
 
     /** Current DB schema version; bumped when a migration is added (see SchemaVersion). */
-    public const CURRENT_VERSION = '1';
+    public const CURRENT_VERSION = '2';
 
     public static function codesTable(\wpdb $wpdb): string { return $wpdb->prefix . self::CODES; }
     public static function requestsTable(\wpdb $wpdb): string { return $wpdb->prefix . self::REQUESTS; }
@@ -23,7 +23,6 @@ final class Schema
         dbDelta("CREATE TABLE $codes (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   product varchar(32) NOT NULL,
-  value_cents int(11) NOT NULL,
   purchase_date date NOT NULL,
   expires_on date NOT NULL,
   code varchar(64) NOT NULL,

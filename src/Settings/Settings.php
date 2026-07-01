@@ -7,6 +7,26 @@ final class Settings
     public const OPTION = 'porto_sender_settings';
     private const MODES = ['email', 'name', 'name_or_email', 'none'];
     private const PRODUCTS = ['standardbrief', 'grossbrief'];
+    private const LAYOUTS = ['stacked', 'compact', 'card'];
+
+    /** Editable-text keys → their built-in German defaults (used as fallback). */
+    public const TEXT_DEFAULTS = [
+        'text_intro' => '',
+        'text_label_name' => 'Name',
+        'text_label_email' => 'E-Mail',
+        'text_legend_products' => 'Was möchtest du senden?',
+        'text_consent' => 'Ich bin einverstanden, dass mein Name und meine E-Mail zur Zusendung des Codes verarbeitet werden.',
+        'text_button' => 'Porto-Code anfordern',
+    ];
+
+    /** E-mail template keys (subject + body per message); default '' = use Mailer's built-in copy. */
+    public const EMAIL_KEYS = [
+        'email_confirm_subject', 'email_confirm_body',
+        'email_delivery_subject', 'email_delivery_body',
+        'email_admin_subject', 'email_admin_body',
+        'email_lowstock_subject', 'email_lowstock_body',
+        'email_outofstock_subject', 'email_outofstock_body',
+    ];
 
     private array $values;
 
@@ -58,8 +78,18 @@ final class Settings
             'reservation_ttl_minutes' => 30,
             'expiry_warning_months' => 6,
             'privacy_policy_url' => '',
+            // Form appearance (Item 1b) — all with working presets.
+            'form_layout' => 'stacked',
+            'form_accent_color' => '#0b5fff',
+            'form_button_bg' => '#0b5fff',
+            'form_button_text' => '#ffffff',
+            'form_max_width_px' => 520,
+            'form_field_gap_px' => 12,
+            // Follow-up + result pages (Item 2) — 0 = plugin built-in view.
+            'page_sent' => 0,
+            'page_result' => 0,
             'hash_salt' => '',
-        ];
+        ] + self::TEXT_DEFAULTS + array_fill_keys(self::EMAIL_KEYS, '');
     }
 
     public function ownerAddress(): string { return (string) $this->values['owner_address']; }
@@ -96,6 +126,28 @@ final class Settings
     public function expiryWarningMonths(): int { return (int) $this->values['expiry_warning_months']; }
     public function privacyPolicyUrl(): string { return (string) $this->values['privacy_policy_url']; }
     public function hashSalt(): string { return (string) $this->values['hash_salt']; }
+
+    // Form appearance (Item 1b)
+    public function formLayout(): string { return in_array($this->values['form_layout'] ?? '', self::LAYOUTS, true) ? (string) $this->values['form_layout'] : 'stacked'; }
+    public function formAccentColor(): string { return (string) $this->values['form_accent_color']; }
+    public function formButtonBg(): string { return (string) $this->values['form_button_bg']; }
+    public function formButtonText(): string { return (string) $this->values['form_button_text']; }
+    public function formMaxWidthPx(): int { return (int) $this->values['form_max_width_px']; }
+    public function formFieldGapPx(): int { return (int) $this->values['form_field_gap_px']; }
+
+    /** Configured UI text for $key, falling back to the built-in default. */
+    public function text(string $key): string
+    {
+        $v = (string) ($this->values[$key] ?? '');
+        return $v !== '' ? $v : (string) (self::TEXT_DEFAULTS[$key] ?? '');
+    }
+
+    // Pages (Item 2)
+    public function pageSent(): int { return (int) $this->values['page_sent']; }
+    public function pageResult(): int { return (int) $this->values['page_result']; }
+
+    /** Raw configured e-mail template for $key ('' = caller should use its built-in default). */
+    public function emailTemplate(string $key): string { return (string) ($this->values[$key] ?? ''); }
 
     public static function sanitize(array $input): array
     {
@@ -145,6 +197,34 @@ final class Settings
         $result['geo_maxmind_db_path'] = sanitize_text_field($input['geo_maxmind_db_path'] ?? $result['geo_maxmind_db_path']);
         $result['geo_api_url'] = esc_url_raw($input['geo_api_url'] ?? $result['geo_api_url']);
         $result['geo_api_key'] = sanitize_text_field($input['geo_api_key'] ?? $result['geo_api_key']);
+
+        // Form appearance (Item 1b). Invalid hex/enum keeps the stored/default value.
+        $result['form_layout'] = in_array($input['form_layout'] ?? '', self::LAYOUTS, true)
+            ? $input['form_layout'] : $result['form_layout'];
+        foreach (['form_accent_color', 'form_button_bg', 'form_button_text'] as $ck) {
+            $hex = sanitize_hex_color((string) ($input[$ck] ?? ''));
+            $result[$ck] = ($hex !== null && $hex !== '') ? $hex : $result[$ck];
+        }
+        $result['form_max_width_px'] = absint($input['form_max_width_px'] ?? $result['form_max_width_px']);
+        $result['form_field_gap_px'] = absint($input['form_field_gap_px'] ?? $result['form_field_gap_px']);
+
+        // Editable UI text (Item 1b).
+        $result['text_intro'] = sanitize_textarea_field($input['text_intro'] ?? $result['text_intro']);
+        $result['text_consent'] = sanitize_textarea_field($input['text_consent'] ?? $result['text_consent']);
+        foreach (['text_label_name', 'text_label_email', 'text_legend_products', 'text_button'] as $tk) {
+            $result[$tk] = sanitize_text_field($input[$tk] ?? $result[$tk]);
+        }
+
+        // Pages (Item 2).
+        $result['page_sent'] = absint($input['page_sent'] ?? $result['page_sent']);
+        $result['page_result'] = absint($input['page_result'] ?? $result['page_result']);
+
+        // E-mail templates (Item 6): subjects single-line, bodies multi-line.
+        foreach (self::EMAIL_KEYS as $ek) {
+            $result[$ek] = str_ends_with($ek, '_subject')
+                ? sanitize_text_field($input[$ek] ?? $result[$ek])
+                : sanitize_textarea_field($input[$ek] ?? $result[$ek]);
+        }
 
         return $result;
     }

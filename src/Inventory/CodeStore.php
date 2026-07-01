@@ -4,7 +4,7 @@ namespace PortoSender\Inventory;
 
 interface CodeStore
 {
-    public function addBatch(string $product, int $valueCents, \DateTimeImmutable $purchaseDate, array $codes): int;
+    public function addBatch(string $product, \DateTimeImmutable $purchaseDate, array $codes): int;
     /** @return array<int,array<string,mixed>> every codes row as an associative array (for export) */
     public function allRows(): array;
     /** Delete every row (DML, transaction-safe). @return int rows removed */
@@ -23,6 +23,4 @@ interface CodeStore
     public function findExpiring(\DateTimeImmutable $now, int $withinMonths): array;
     /** @return array<object> */
     public function recentIssued(int $limit): array;
-    /** @return array<object> */
-    public function findBelowValue(string $product, int $minCents): array;
 }

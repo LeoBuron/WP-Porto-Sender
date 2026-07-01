@@ -49,7 +49,7 @@ final class AdminNotificationFlowTest extends PortoTestCase
             new UrlConfirmLinkBuilder(), $settings, ProductCatalog::default(), new SystemClock(), $notifier
         );
 
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['NOTIFYCODE1', 'NOTIFYCODE2']);
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['NOTIFYCODE1', 'NOTIFYCODE2']);
         $requests->createPending([
             'name' => 'Vera', 'email' => 'v@example.de',
             'email_hash' => $hasher->email('v@example.de'), 'name_hash' => $hasher->name('Vera'),
@@ -106,7 +106,7 @@ final class AdminNotificationFlowTest extends PortoTestCase
             $codes, $requests, new Mailer($settings), $hasher, new TokenGenerator(),
             new UrlConfirmLinkBuilder(), $settings, ProductCatalog::default(), new SystemClock(), $notifier
         );
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2026-01-01'), ['BOOMCODE']);
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['BOOMCODE']);
         $requests->createPending([
             'name' => 'Vera', 'email' => 'v@example.de',
             'email_hash' => $hasher->email('v@example.de'), 'name_hash' => $hasher->name('Vera'),

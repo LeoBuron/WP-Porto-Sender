@@ -11,7 +11,7 @@ final class CodeRepository implements CodeStore
 
     private function table(): string { return Schema::codesTable($this->wpdb); }
 
-    public function addBatch(string $product, int $valueCents, \DateTimeImmutable $purchaseDate, array $codes): int
+    public function addBatch(string $product, \DateTimeImmutable $purchaseDate, array $codes): int
     {
         $table = $this->table();
         $purchase = $purchaseDate->format('Y-m-d');
@@ -22,9 +22,9 @@ final class CodeRepository implements CodeStore
             $code = trim((string) $raw);
             if ($code === '') { continue; }
             $affected = $this->wpdb->query($this->wpdb->prepare(
-                "INSERT IGNORE INTO $table (product,value_cents,purchase_date,expires_on,code,status,created_at,updated_at)
-                 VALUES (%s,%d,%s,%s,%s,'available',%s,%s)",
-                $product, $valueCents, $purchase, $expires, $code, $now, $now
+                "INSERT IGNORE INTO $table (product,purchase_date,expires_on,code,status,created_at,updated_at)
+                 VALUES (%s,%s,%s,%s,'available',%s,%s)",
+                $product, $purchase, $expires, $code, $now, $now
             ));
             $inserted += $affected ? 1 : 0;
         }
@@ -40,7 +40,7 @@ final class CodeRepository implements CodeStore
 
     /** Real columns of porto_codes — the allowlist for untrusted bundle import. */
     private const COLUMNS = [
-        'id', 'product', 'value_cents', 'purchase_date', 'expires_on', 'code', 'status',
+        'id', 'product', 'purchase_date', 'expires_on', 'code', 'status',
         'reserved_until', 'issued_to_hash', 'issued_at', 'request_id', 'created_at', 'updated_at',
     ];
 
@@ -158,16 +158,6 @@ final class CodeRepository implements CodeStore
         $table = $this->table();
         return $this->wpdb->get_results($this->wpdb->prepare(
             "SELECT * FROM $table WHERE status='issued' ORDER BY issued_at DESC LIMIT %d", $limit
-        )) ?: [];
-    }
-
-    /** @return array<object> */
-    public function findBelowValue(string $product, int $minCents): array
-    {
-        $table = $this->table();
-        return $this->wpdb->get_results($this->wpdb->prepare(
-            "SELECT * FROM $table WHERE product=%s AND status='available' AND value_cents < %d ORDER BY value_cents ASC",
-            $product, $minCents
         )) ?: [];
     }
 }

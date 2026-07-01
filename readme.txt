@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.4.2
+Stable tag: 0.5.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,14 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.5.0 =
+* Settings reorganised into tabs (Allgemein, Formular & Layout, Seiten, E-Mails, Missbrauchsschutz, Daten & Aufbewahrung, Geo) for a clearer, less cluttered admin.
+* Configurable request-form appearance: layout presets (gestapelt/kompakt/karte), colours with one-click schemes and a native colour picker, spacing, and editable labels/intro/button — all with sensible defaults.
+* Editable e-mail messages (subject + body) with placeholders such as %name%, %code%, %confirm_url%, %owner_address%. Blank fields keep the built-in copy.
+* After submitting, visitors see a themed "Bitte E-Mail bestätigen" page; the confirmation link leads to a themed result page. Both are rendered by the plugin and can optionally be overridden with your own WordPress pages.
+* The Altcha HMAC secret field is now masked, with a show/hide toggle.
+* Removed the per-code postage-value tracking and the confusing "Codes below current postage value" warning.
 
 = 0.4.2 =
 * Fix: the public request form and captcha now work even when the whole REST API is restricted to logged-in users (e.g. the "Disable WP REST API" plugin). The plugin re-allows only its own two public routes (captcha challenge + form submit); the rest of the REST API stays locked. This was the real cause of the captcha "failing on smartphones" — logged-out visitors were being blocked with a 401.

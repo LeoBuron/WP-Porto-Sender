@@ -10,8 +10,8 @@ final class ProductCatalog
     public static function default(): self
     {
         return new self([
-            'standardbrief' => new PostageProduct('standardbrief', 95, 'Standardbrief', 'bis 20 g, gefaltet (z. B. 3 Seiten)'),
-            'grossbrief' => new PostageProduct('grossbrief', 180, 'Großbrief', 'A4 flach, bis 500 g'),
+            'standardbrief' => new PostageProduct('standardbrief', 'Standardbrief', 'bis 20 g, gefaltet (z. B. 3 Seiten)'),
+            'grossbrief' => new PostageProduct('grossbrief', 'Großbrief', 'A4 flach, bis 500 g'),
         ]);
     }
 

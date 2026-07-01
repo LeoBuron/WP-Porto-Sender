@@ -18,7 +18,7 @@ final class MaintenanceTest extends PortoTestCase
         global $wpdb;
         $codes = new CodeRepository($wpdb);
         $requests = new RequestRepository($wpdb);
-        $codes->addBatch('grossbrief', 180, new \DateTimeImmutable('2020-01-01'), ['EXP']); // expires 2023
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2020-01-01'), ['EXP']); // expires 2023
         $requests->createPending([
             'name' => 'X', 'email' => 'x@e.de', 'email_hash' => str_repeat('a', 64), 'name_hash' => str_repeat('b', 64),
             'product' => 'grossbrief', 'token_hash' => str_repeat('c', 64), 'ip_hash' => null, 'created_at' => '2026-06-01 10:00:00',

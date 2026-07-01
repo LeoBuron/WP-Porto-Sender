@@ -1,0 +1,44 @@
+/**
+ * WP-Porto-Sender — admin settings screen (tabbed layout).
+ *
+ * Progressive enhancement: panels are only hidden once admin-settings.js adds the
+ * `.porto-js-tabs` class to <html>. Without JS the class is never added, so every
+ * panel stays visible and the page degrades to a plain long form.
+ */
+
+.porto-js-tabs .porto-tab-panel {
+  display: none;
+}
+
+.porto-js-tabs .porto-tab-panel.porto-tab-active {
+  display: block;
+}
+
+/* With JS active the tab labels already name each section, so the per-panel
+   heading is redundant; keep it for the no-JS long-page view only. */
+.porto-js-tabs .porto-tab-title {
+  display: none;
+}
+
+.porto-tab-panel {
+  max-width: 46rem;
+  margin-top: 1em;
+}
+
+.porto-tab-panel fieldset {
+  margin: 0 0 1.5em;
+  padding: 0.5em 0 0;
+  border: 0;
+  border-top: 1px solid #dcdcde;
+}
+
+.porto-tab-panel legend {
+  font-weight: 600;
+  padding-top: 0.5em;
+}
+
+.porto-scheme-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+}

@@ -18,7 +18,7 @@ final class ImportServiceTest extends PortoTestCase
         $requests = new RequestRepository($wpdb);
 
         // --- source install: seed data, a known salt, and a salted token ---
-        $codes->addBatch('standardbrief', 95, new \DateTimeImmutable('2026-01-15'), ['ORIG1', 'ORIG2']);
+        $codes->addBatch('standardbrief', new \DateTimeImmutable('2026-01-15'), ['ORIG1', 'ORIG2']);
         $requests->createPending([
             'name' => 'Alice', 'email' => 'alice@example.test',
             'email_hash' => 'eh', 'name_hash' => 'nh', 'product' => 'standardbrief',
@@ -81,7 +81,7 @@ final class ImportServiceTest extends PortoTestCase
         global $wpdb;
         $codes = new CodeRepository($wpdb);
         $requests = new RequestRepository($wpdb);
-        $codes->addBatch('standardbrief', 95, new \DateTimeImmutable('2026-01-15'), ['KEEPME']);
+        $codes->addBatch('standardbrief', new \DateTimeImmutable('2026-01-15'), ['KEEPME']);
 
         // Structurally-valid bundle but "codes" is a scalar -> must abort BEFORE any deleteAll.
         $corrupt = json_encode([

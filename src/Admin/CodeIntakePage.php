@@ -26,14 +26,13 @@ final class CodeIntakePage
     {
         $product = (string) ($post['product'] ?? '');
         if ($this->catalog->get($product) === null) { return 0; }
-        $valueCents = (int) ($post['value_cents'] ?? $this->catalog->get($product)->valueCents);
         $purchase = \DateTimeImmutable::createFromFormat('Y-m-d', (string) ($post['purchase_date'] ?? ''))
             ?: new \DateTimeImmutable('now');
-        return $this->codes->addBatch($product, $valueCents, $purchase, self::parseCodes((string) ($post['codes'] ?? '')));
+        return $this->codes->addBatch($product, $purchase, self::parseCodes((string) ($post['codes'] ?? '')));
     }
 
     /**
-     * Import codes from a CSV file (columns: product,code[,value_cents][,purchase_date]).
+     * Import codes from a CSV file (columns: product,code[,purchase_date]).
      *
      * @return array{inserted:int,skipped:array<int,array{row:int,reason:string}>}
      * @throws \RuntimeException if the CSV lacks required columns or is oversized
@@ -102,17 +101,16 @@ final class CodeIntakePage
         echo '<input type="hidden" name="action" value="porto_intake">';
         echo '<p><select name="product">';
         foreach ($this->catalog->all() as $p) {
-            printf('<option value="%s">%s (%d ct)</option>', esc_attr($p->key), esc_html($p->label), $p->valueCents);
+            printf('<option value="%s">%s</option>', esc_attr($p->key), esc_html($p->label));
         }
         echo '</select></p>';
         echo '<p><label>' . esc_html__('Kaufdatum', 'wp-porto-sender') . ' <input type="date" name="purchase_date" required></label></p>';
-        echo '<p><label>' . esc_html__('Bezahlter Portowert (ct)', 'wp-porto-sender') . ' <input type="number" name="value_cents"></label></p>';
         echo '<p><textarea name="codes" rows="10" cols="40" placeholder="ein Code pro Zeile"></textarea></p>';
         submit_button(__('Hinzufügen', 'wp-porto-sender'));
         echo '</form>';
 
         echo '<hr><h2>' . esc_html__('CSV-Import', 'wp-porto-sender') . '</h2>';
-        echo '<p>' . esc_html__('Spalten: product,code[,value_cents][,purchase_date] — Kopfzeile erforderlich.', 'wp-porto-sender') . '</p>';
+        echo '<p>' . esc_html__('Spalten: product,code[,purchase_date] — Kopfzeile erforderlich.', 'wp-porto-sender') . '</p>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" enctype="multipart/form-data">';
         wp_nonce_field('porto_intake_csv');
         echo '<input type="hidden" name="action" value="porto_intake_csv">';

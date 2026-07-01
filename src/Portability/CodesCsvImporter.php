@@ -9,10 +9,9 @@ use PortoSender\Postage\ProductCatalog;
 /**
  * Imports postage codes from a CSV into the code store.
  *
- * CSV columns: required `product`, `code`; optional `value_cents`
- * (defaults to the catalog value) and `purchase_date` (`Y-m-d`, defaults to
- * today). There is deliberately no `expires_on` column — expiry is a derived
- * business rule (Expiry::expiresOn) applied inside the store's addBatch.
+ * CSV columns: required `product`, `code`; optional `purchase_date` (`Y-m-d`,
+ * defaults to today). There is deliberately no `expires_on` column — expiry is a
+ * derived business rule (Expiry::expiresOn) applied inside the store's addBatch.
  *
  * Each accepted row is inserted via a one-element addBatch call: the store uses
  * INSERT IGNORE keyed on the unique `code`, so a return of 0 means the code
@@ -58,16 +57,6 @@ final class CodesCsvImporter
                 continue;
             }
 
-            $valueCents = $product->valueCents;
-            $rawValue = trim($row['value_cents'] ?? '');
-            if ($rawValue !== '') {
-                if (!ctype_digit($rawValue)) {
-                    $skipped[] = ['row' => $line, 'reason' => 'invalid value_cents'];
-                    continue;
-                }
-                $valueCents = (int) $rawValue;
-            }
-
             $purchase = new \DateTimeImmutable('now');
             $rawDate = trim($row['purchase_date'] ?? '');
             if ($rawDate !== '') {
@@ -87,7 +76,7 @@ final class CodesCsvImporter
             }
             $seen[$code] = true;
 
-            if ($this->codes->addBatch($product->key, $valueCents, $purchase, [$code]) >= 1) {
+            if ($this->codes->addBatch($product->key, $purchase, [$code]) >= 1) {
                 $inserted++;
             } else {
                 $skipped[] = ['row' => $line, 'reason' => 'code already exists in database'];

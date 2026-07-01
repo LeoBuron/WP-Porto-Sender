@@ -6,7 +6,6 @@ final class PostageProduct
 {
     public function __construct(
         public readonly string $key,
-        public readonly int $valueCents,
         public readonly string $label,
         public readonly string $limits,
     ) {}

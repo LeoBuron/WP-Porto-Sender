@@ -47,7 +47,7 @@ final class DataLifecycleActionsTest extends PortoTestCase
         global $wpdb;
         remove_filter('query', [$this, '_drop_temporary_tables']); // let purgeAll's DROP hit real tables
         $codes = new CodeRepository($wpdb);
-        $codes->addBatch('standardbrief', 95, new \DateTimeImmutable('2026-01-15'), ['WIPEME']);
+        $codes->addBatch('standardbrief', new \DateTimeImmutable('2026-01-15'), ['WIPEME']);
         update_option(Settings::OPTION, array_merge(Settings::defaults(), ['hash_salt' => 'OLDSALT', 'owner_address' => 'X']));
 
         (new ToolsPage($codes, new RequestRepository($wpdb)))->deleteAllData();
@@ -56,7 +56,7 @@ final class DataLifecycleActionsTest extends PortoTestCase
         $this->assertNotSame('OLDSALT', $opt['hash_salt']);    // fresh salt
         $this->assertNotSame('', $opt['hash_salt']);
         $this->assertSame('', $opt['owner_address']);          // defaults
-        $this->assertSame('1', get_option(SchemaVersion::OPTION));
+        $this->assertSame(Schema::CURRENT_VERSION, get_option(SchemaVersion::OPTION));
         $this->assertSame(0, $codes->availableCount('standardbrief', new \DateTimeImmutable('now'))); // empty, recreated
     }
 

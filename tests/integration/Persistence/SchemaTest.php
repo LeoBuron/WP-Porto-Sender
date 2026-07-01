@@ -14,8 +14,9 @@ final class SchemaTest extends PortoTestCase
         $this->assertSame($codes, $wpdb->get_var("SHOW TABLES LIKE '$codes'"));
         $this->assertSame($requests, $wpdb->get_var("SHOW TABLES LIKE '$requests'"));
         $cols = $wpdb->get_col("SHOW COLUMNS FROM $codes");
-        foreach (['id','product','value_cents','purchase_date','expires_on','code','status','reserved_until','issued_to_hash','request_id'] as $c) {
+        foreach (['id','product','purchase_date','expires_on','code','status','reserved_until','issued_to_hash','request_id'] as $c) {
             $this->assertContains($c, $cols, "codes.$c missing");
         }
+        $this->assertNotContains('value_cents', $cols, 'value_cents was dropped in v0.5.0');
     }
 }

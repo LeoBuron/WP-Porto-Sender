@@ -7,15 +7,19 @@ use PortoSender\Postage\ProductCatalog;
 
 final class SettingsPage
 {
+    /** Menu hook suffix, captured from add_menu_page() so we scope asset loading to this page. */
+    private ?string $hookSuffix = null;
+
     public function register(): void
     {
         add_action('admin_menu', [$this, 'addMenu']);
         add_action('admin_init', [$this, 'registerSetting']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
     }
 
     public function addMenu(): void
     {
-        add_menu_page(
+        $this->hookSuffix = add_menu_page(
             __('Porto-Sender', 'wp-porto-sender'), __('Porto-Sender', 'wp-porto-sender'),
             'manage_options', 'porto-sender', [$this, 'render'], 'dashicons-email-alt'
         );
@@ -30,19 +34,98 @@ final class SettingsPage
         ]);
     }
 
+    /**
+     * Load the colour picker + tab assets only on this settings screen.
+     *
+     * @param string $hook Current admin page hook suffix (passed by WordPress).
+     */
+    public function enqueueAssets(string $hook): void
+    {
+        if ($hook !== $this->hookSuffix) { return; }
+        $base = plugins_url('assets/', dirname(__DIR__, 2) . '/porto-sender.php');
+        wp_enqueue_style('wp-color-picker');
+        wp_enqueue_style('porto-admin-settings', $base . 'admin-settings.css', [], '1.0.0');
+        wp_enqueue_script('porto-admin-settings', $base . 'admin-settings.js', ['wp-color-picker'], '1.0.0', true);
+    }
+
+    /**
+     * The tabbed settings screen. Tabs are presentation-only: every field is rendered
+     * inside the single options.php <form>, so Settings::sanitize() still receives all
+     * keys on save (no unshown checkbox is ever silently wiped). A small admin script
+     * shows one panel at a time; with JS disabled every panel stays visible.
+     */
     public function render(): void
     {
         if (!current_user_can('manage_options')) { return; }
         $s = Settings::fromOption();
         $catalog = ProductCatalog::default();
+        $opt = Settings::OPTION;
+
+        $tabs = [
+            'general'   => __('Allgemein', 'wp-porto-sender'),
+            'form'      => __('Formular & Layout', 'wp-porto-sender'),
+            'pages'     => __('Seiten', 'wp-porto-sender'),
+            'emails'    => __('E-Mails', 'wp-porto-sender'),
+            'abuse'     => __('Missbrauchsschutz', 'wp-porto-sender'),
+            'retention' => __('Daten & Aufbewahrung', 'wp-porto-sender'),
+            'geo'       => __('Geo', 'wp-porto-sender'),
+        ];
+
         echo '<div class="wrap"><h1>' . esc_html__('Porto-Sender – Einstellungen', 'wp-porto-sender') . '</h1>';
+
+        echo '<h2 class="nav-tab-wrapper">';
+        $first = true;
+        foreach ($tabs as $slug => $label) {
+            printf(
+                '<a href="#porto-tab-%1$s" class="nav-tab%2$s" data-porto-tab="%1$s">%3$s</a>',
+                esc_attr($slug), $first ? ' nav-tab-active' : '', esc_html($label)
+            );
+            $first = false;
+        }
+        echo '</h2>';
+
         echo '<form method="post" action="options.php">';
         settings_fields('porto_sender');
-        $opt = Settings::OPTION;
-        // Owner address
+
+        $first = true;
+        foreach ($tabs as $slug => $label) {
+            printf(
+                '<div class="porto-tab-panel%2$s" id="porto-tab-%1$s" data-tab="%1$s" role="tabpanel">',
+                esc_attr($slug), $first ? ' porto-tab-active' : ''
+            );
+            echo '<h2 class="porto-tab-title">' . esc_html($label) . '</h2>';
+            switch ($slug) {
+                case 'general':   $this->renderGeneral($s, $opt, $catalog); break;
+                case 'form':      $this->renderFormLayout($s, $opt); break;
+                case 'pages':     $this->renderPages($s, $opt); break;
+                case 'emails':    $this->renderEmails($s, $opt); break;
+                case 'abuse':     $this->renderAbuse($s, $opt); break;
+                case 'retention': $this->renderRetention($s, $opt); break;
+                case 'geo':       $this->renderGeo($s, $opt); break;
+            }
+            echo '</div>';
+            $first = false;
+        }
+
+        submit_button();
+        echo '</form></div>';
+
+        $this->renderSecretScript();
+    }
+
+    private function renderGeneral(Settings $s, string $opt, ProductCatalog $catalog): void
+    {
         printf('<p><label>%s<br><textarea name="%s[owner_address]" rows="4" cols="40">%s</textarea></label></p>',
             esc_html__('Deine Postadresse (steht in der E-Mail)', 'wp-porto-sender'), esc_attr($opt), esc_textarea($s->ownerAddress()));
-        // Enabled products + per-product threshold
+
+        printf('<p><label>%s<br><input type="email" name="%s[alert_email]" value="%s"></label>',
+            esc_html__('Alarm-E-Mail', 'wp-porto-sender'), esc_attr($opt), esc_attr($s->alertEmail()));
+        printf('<br><span class="description">%s</span></p>',
+            esc_html__('Empfängt Bestandswarnungen und – falls aktiviert – Abruf-Benachrichtigungen.', 'wp-porto-sender'));
+
+        printf('<p><label>%s<br><input type="url" name="%s[privacy_policy_url]" value="%s"></label></p>',
+            esc_html__('Datenschutz-URL', 'wp-porto-sender'), esc_attr($opt), esc_attr($s->privacyPolicyUrl()));
+
         echo '<fieldset><legend>' . esc_html__('Aktive Produkte & Mindestbestand', 'wp-porto-sender') . '</legend>';
         foreach ($catalog->all() as $p) {
             $checked = in_array($p->key, $s->enabledProducts(), true) ? 'checked' : '';
@@ -51,41 +134,152 @@ final class SettingsPage
                 esc_attr($opt), esc_attr($p->key), $checked, esc_html($p->label), $s->lowStockThreshold($p->key));
         }
         echo '</fieldset>';
-        // Dedup mode
+    }
+
+    private function renderFormLayout(Settings $s, string $opt): void
+    {
+        // Layout presets (plain labels + one-line description each).
+        $layouts = [
+            'stacked' => [__('Gestapelt', 'wp-porto-sender'), __('Übersichtlich, ein Feld pro Zeile (Standard).', 'wp-porto-sender')],
+            'compact' => [__('Kompakt', 'wp-porto-sender'), __('Engere Abstände für dichte Seiten oder Sidebars.', 'wp-porto-sender')],
+            'card'    => [__('Karte', 'wp-porto-sender'), __('Formular in einer hervorgehobenen Box.', 'wp-porto-sender')],
+        ];
+        echo '<fieldset><legend>' . esc_html__('Layout', 'wp-porto-sender') . '</legend>';
+        foreach ($layouts as $val => [$lbl, $desc]) {
+            printf('<p><label><input type="radio" name="%1$s[form_layout]" value="%2$s" %3$s> <strong>%4$s</strong></label> <span class="description">%5$s</span></p>',
+                esc_attr($opt), esc_attr($val), checked($s->formLayout(), $val, false), esc_html($lbl), esc_html($desc));
+        }
+        echo '</fieldset>';
+
+        // Colours — native WP colour picker; no hex typing required.
+        echo '<fieldset><legend>' . esc_html__('Farben', 'wp-porto-sender') . '</legend>';
+        echo '<p class="description">' . esc_html__('Fertige Farbschemata (ein Klick füllt die Auswahl, danach frei anpassbar):', 'wp-porto-sender') . '</p>';
+        $schemes = [
+            [__('Blau (Standard)', 'wp-porto-sender'), '#0b5fff', '#0b5fff', '#ffffff'],
+            [__('Grün', 'wp-porto-sender'), '#1a7f37', '#1a7f37', '#ffffff'],
+            [__('Rot', 'wp-porto-sender'), '#cf222e', '#cf222e', '#ffffff'],
+            [__('Neutral', 'wp-porto-sender'), '#444444', '#444444', '#ffffff'],
+        ];
+        echo '<p class="porto-scheme-presets">';
+        foreach ($schemes as [$lbl, $accent, $btnBg, $btnText]) {
+            printf('<button type="button" class="button porto-scheme" data-accent="%s" data-btn-bg="%s" data-btn-text="%s">%s</button> ',
+                esc_attr($accent), esc_attr($btnBg), esc_attr($btnText), esc_html($lbl));
+        }
+        echo '</p>';
+        $this->renderColorField($opt, 'porto-color-accent', 'form_accent_color', $s->formAccentColor(), '#0b5fff', __('Akzentfarbe (Links, Rahmen, Fokus)', 'wp-porto-sender'));
+        $this->renderColorField($opt, 'porto-color-btn-bg', 'form_button_bg', $s->formButtonBg(), '#0b5fff', __('Button-Hintergrund', 'wp-porto-sender'));
+        $this->renderColorField($opt, 'porto-color-btn-text', 'form_button_text', $s->formButtonText(), '#ffffff', __('Button-Textfarbe', 'wp-porto-sender'));
+        echo '</fieldset>';
+
+        // Sizing.
+        echo '<fieldset><legend>' . esc_html__('Größe & Abstände', 'wp-porto-sender') . '</legend>';
+        printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[form_max_width_px]" value="%3$d"></label>',
+            esc_attr($opt), esc_html__('Maximale Breite in Pixel (0 = volle Breite)', 'wp-porto-sender'), $s->formMaxWidthPx());
+        printf('<br><span class="description">%s</span></p>',
+            esc_html__('Begrenzt die Formularbreite; 0 lässt es die volle verfügbare Breite einnehmen.', 'wp-porto-sender'));
+        printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[form_field_gap_px]" value="%3$d"></label></p>',
+            esc_attr($opt), esc_html__('Abstand zwischen den Feldern in Pixel', 'wp-porto-sender'), $s->formFieldGapPx());
+        echo '</fieldset>';
+
+        // Editable texts.
+        echo '<fieldset><legend>' . esc_html__('Texte', 'wp-porto-sender') . '</legend>';
+        printf('<p><label>%2$s<br><textarea name="%1$s[text_intro]" rows="2" cols="50">%3$s</textarea></label>',
+            esc_attr($opt), esc_html__('Einleitungstext (optional, wird über dem Formular angezeigt)', 'wp-porto-sender'), esc_textarea($s->text('text_intro')));
+        printf('<br><span class="description">%s</span></p>',
+            esc_html__('Leer lassen, um keinen Einleitungstext anzuzeigen.', 'wp-porto-sender'));
+        printf('<p><label>%2$s<br><input type="text" name="%1$s[text_label_name]" value="%3$s"></label></p>',
+            esc_attr($opt), esc_html__('Feldbeschriftung Name', 'wp-porto-sender'), esc_attr($s->text('text_label_name')));
+        printf('<p><label>%2$s<br><input type="text" name="%1$s[text_label_email]" value="%3$s"></label></p>',
+            esc_attr($opt), esc_html__('Feldbeschriftung E-Mail', 'wp-porto-sender'), esc_attr($s->text('text_label_email')));
+        printf('<p><label>%2$s<br><input type="text" name="%1$s[text_legend_products]" value="%3$s"></label></p>',
+            esc_attr($opt), esc_html__('Überschrift Produktauswahl', 'wp-porto-sender'), esc_attr($s->text('text_legend_products')));
+        printf('<p><label>%2$s<br><textarea name="%1$s[text_consent]" rows="2" cols="50">%3$s</textarea></label></p>',
+            esc_attr($opt), esc_html__('Einwilligungstext (Checkbox)', 'wp-porto-sender'), esc_textarea($s->text('text_consent')));
+        printf('<p><label>%2$s<br><input type="text" name="%1$s[text_button]" value="%3$s"></label></p>',
+            esc_attr($opt), esc_html__('Button-Beschriftung', 'wp-porto-sender'), esc_attr($s->text('text_button')));
+        echo '</fieldset>';
+    }
+
+    private function renderColorField(string $opt, string $id, string $key, string $value, string $default, string $label): void
+    {
+        printf('<p><label>%1$s<br><input type="text" class="porto-color-field" id="%2$s" name="%3$s[%4$s]" value="%5$s" data-default-color="%6$s"></label></p>',
+            esc_html($label), esc_attr($id), esc_attr($opt), esc_attr($key), esc_attr($value), esc_attr($default));
+    }
+
+    private function renderPages(Settings $s, string $opt): void
+    {
+        echo '<p class="description">' . esc_html__('Wähle optional eigene Seiten für die Rückmeldungen. „Plugin-Standard" zeigt eine themenintegrierte Standardseite.', 'wp-porto-sender') . '</p>';
+        $this->renderPageDropdown($opt, 'page_sent', $s->pageSent(),
+            __('Seite „Bitte E-Mail bestätigen" (nach dem Absenden)', 'wp-porto-sender'));
+        $this->renderPageDropdown($opt, 'page_result', $s->pageResult(),
+            __('Ergebnisseite (nach Klick auf den Bestätigungslink)', 'wp-porto-sender'));
+    }
+
+    private function renderPageDropdown(string $opt, string $key, int $selected, string $label): void
+    {
+        echo '<p><label>' . esc_html($label) . '<br>';
+        echo wp_dropdown_pages([
+            'name' => $opt . '[' . $key . ']',
+            'id' => 'porto-' . str_replace('_', '-', $key),
+            'echo' => 0,
+            'show_option_none' => __('— Plugin-Standard —', 'wp-porto-sender'),
+            'option_none_value' => '0',
+            'selected' => $selected,
+        ]);
+        echo '</label></p>';
+    }
+
+    private function renderEmails(Settings $s, string $opt): void
+    {
+        echo '<p class="description">' . esc_html__('Betreff und Text der automatischen E-Mails. Leer lassen, um die eingebauten Standardtexte zu verwenden. Verfügbare Platzhalter stehen unter jedem Feld.', 'wp-porto-sender') . '</p>';
+        $messages = [
+            'confirm'    => [__('Bestätigung (Double-Opt-In)', 'wp-porto-sender'), ['%name%', '%confirm_url%']],
+            'delivery'   => [__('Zustellung (der Code)', 'wp-porto-sender'), ['%name%', '%product%', '%limits%', '%code%', '%owner_address%']],
+            'admin'      => [__('Admin-Benachrichtigung', 'wp-porto-sender'), ['%product%', '%count%', '%remaining%', '%name%', '%email%']],
+            'lowstock'   => [__('Geringer Bestand', 'wp-porto-sender'), ['%product%', '%remaining%']],
+            'outofstock' => [__('Kein Bestand', 'wp-porto-sender'), ['%product%']],
+        ];
+        foreach ($messages as $key => [$label, $placeholders]) {
+            $subjectKey = 'email_' . $key . '_subject';
+            $bodyKey = 'email_' . $key . '_body';
+            echo '<fieldset><legend>' . esc_html($label) . '</legend>';
+            printf('<p><label>%1$s<br><input type="text" class="large-text" name="%2$s[%3$s]" value="%4$s"></label></p>',
+                esc_html__('Betreff', 'wp-porto-sender'), esc_attr($opt), esc_attr($subjectKey), esc_attr($s->emailTemplate($subjectKey)));
+            printf('<p><label>%1$s<br><textarea class="large-text" name="%2$s[%3$s]" rows="5">%4$s</textarea></label></p>',
+                esc_html__('Text', 'wp-porto-sender'), esc_attr($opt), esc_attr($bodyKey), esc_textarea($s->emailTemplate($bodyKey)));
+            $codes = implode(' ', array_map(
+                static fn (string $p): string => '<code>' . esc_html($p) . '</code>',
+                $placeholders
+            ));
+            printf('<p class="description">%s %s</p>', esc_html__('Platzhalter:', 'wp-porto-sender'), $codes);
+            if ($key === 'admin') {
+                printf('<p class="description">%s</p>', esc_html__('%name% und %email% werden nur eingesetzt, wenn im Tab „Missbrauchsschutz" die Option „Name und E-Mail mitsenden" aktiviert ist – sonst bleiben sie leer.', 'wp-porto-sender'));
+            }
+            echo '</fieldset>';
+        }
+    }
+
+    private function renderAbuse(Settings $s, string $opt): void
+    {
+        // Per-person request limit (dedup mode).
         echo '<p><label>' . esc_html__('Begrenzung pro Person', 'wp-porto-sender') . ' ';
         echo '<select name="' . esc_attr($opt) . '[request_limit_mode]">';
         foreach (['email' => 'E-Mail', 'name' => 'Name', 'name_or_email' => 'Name oder E-Mail', 'none' => 'Keine'] as $val => $label) {
             printf('<option value="%s" %s>%s</option>', esc_attr($val), selected($s->requestLimitMode(), $val, false), esc_html($label));
         }
         echo '</select></label></p>';
-        // Simple text/number fields
-        $fields = [
-            'alert_email' => [__('Alarm-E-Mail', 'wp-porto-sender'), 'email', $s->alertEmail()],
-            'pii_retention_days' => [__('Datenaufbewahrung ausgegebener Portos (Tage)', 'wp-porto-sender'), 'number', $s->piiRetentionDays()],
-            'unconfirmed_retention_days' => [__('Aufbewahrung unbestätigter Anfragen (Tage)', 'wp-porto-sender'), 'number', $s->unconfirmedRetentionDays()],
-            'altcha_hmac_secret' => [__('Altcha HMAC-Secret', 'wp-porto-sender'), 'text', $s->altchaHmacSecret()],
-            'privacy_policy_url' => [__('Datenschutz-URL', 'wp-porto-sender'), 'url', $s->privacyPolicyUrl()],
-        ];
-        $descriptions = [
-            'pii_retention_days' => __('Name und E-Mail ausgegebener Portos werden nach so vielen Tagen anonymisiert (der Datensatz und die Hashes bleiben für die Missbrauchsprüfung erhalten).', 'wp-porto-sender'),
-            'unconfirmed_retention_days' => __('Nie bestätigte Anfragen werden so viele Tage aufbewahrt (für die Betrugs-/Missbrauchsprüfung) und danach gelöscht. Unabhängig von der Token-Gültigkeit — abgelaufene Links funktionieren weiterhin nicht.', 'wp-porto-sender'),
-        ];
-        foreach ($fields as $key => [$label, $type, $value]) {
-            $idAttr = $key === 'altcha_hmac_secret' ? ' id="porto-altcha-secret"' : '';
-            printf('<p><label>%s<br><input type="%s"%s name="%s[%s]" value="%s"></label>',
-                esc_html($label), esc_attr($type), $idAttr, esc_attr($opt), esc_attr($key), esc_attr((string) $value));
-            if ($key === 'altcha_hmac_secret') {
-                printf(' <button type="button" class="button" id="porto-altcha-generate">%s</button>',
-                    esc_html__('Generieren', 'wp-porto-sender'));
-                printf('<br><span class="description">%s</span>',
-                    esc_html__('Erzeugt ein zufälliges 256-Bit-Secret (64 Hex-Zeichen). Danach unten „Änderungen speichern“ klicken. Ohne gesetztes Secret ist die CAPTCHA-Prüfung inaktiv.', 'wp-porto-sender'));
-            }
-            if (isset($descriptions[$key])) {
-                printf('<br><span class="description">%s</span>', esc_html($descriptions[$key]));
-            }
-            echo '</p>';
-        }
-        // Rate limiting
+
+        // Altcha HMAC secret — masked with generate + show/hide (see renderSecretScript()).
+        printf('<p><label>%1$s<br><input type="password" id="porto-altcha-secret" autocomplete="new-password" name="%2$s[altcha_hmac_secret]" value="%3$s"></label>',
+            esc_html__('Altcha HMAC-Secret', 'wp-porto-sender'), esc_attr($opt), esc_attr($s->altchaHmacSecret()));
+        printf(' <button type="button" class="button" id="porto-altcha-generate">%s</button>',
+            esc_html__('Generieren', 'wp-porto-sender'));
+        printf(' <button type="button" class="button" id="porto-altcha-reveal">%s</button>',
+            esc_html__('Anzeigen', 'wp-porto-sender'));
+        printf('<br><span class="description">%s</span></p>',
+            esc_html__('Erzeugt ein zufälliges 256-Bit-Secret (64 Hex-Zeichen). Danach unten „Änderungen speichern" klicken. Ohne gesetztes Secret ist die CAPTCHA-Prüfung inaktiv.', 'wp-porto-sender'));
+
+        // Rate limiting.
         echo '<fieldset><legend>' . esc_html__('Rate-Limiting (Missbrauchsschutz)', 'wp-porto-sender') . '</legend>';
         printf('<p><label><input type="checkbox" name="%1$s[rate_limit_enabled]" value="1" %2$s> %3$s</label></p>',
             esc_attr($opt), checked($s->rateLimitEnabled(), true, false), esc_html__('Rate-Limiting aktiv', 'wp-porto-sender'));
@@ -94,7 +288,8 @@ final class SettingsPage
         printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[rate_limit_global_hour]" value="%3$d"></label></p>',
             esc_attr($opt), esc_html__('Max. Anfragen gesamt/Stunde', 'wp-porto-sender'), $s->rateLimitGlobalHour());
         echo '</fieldset>';
-        // Admin notifications (sent to the "Alarm-E-Mail" address above).
+
+        // Admin notifications (sent to the "Alarm-E-Mail" address on the Allgemein tab).
         echo '<fieldset><legend>' . esc_html__('Admin-Benachrichtigung bei Abruf', 'wp-porto-sender') . '</legend>';
         printf('<p><label><input type="checkbox" name="%1$s[admin_notify_enabled]" value="1" %2$s> %3$s</label></p>',
             esc_attr($opt), checked($s->adminNotifyEnabled(), true, false),
@@ -105,7 +300,23 @@ final class SettingsPage
         printf('<p><label>%2$s<br><input type="number" min="0" name="%1$s[admin_notify_window_minutes]" value="%3$d"></label></p>',
             esc_attr($opt), esc_html__('Sammelfenster in Minuten (0 = jede Anfrage einzeln)', 'wp-porto-sender'), $s->adminNotifyWindowMinutes());
         echo '</fieldset>';
-        // Geo restriction (default OFF; external sources require sign-off).
+    }
+
+    private function renderRetention(Settings $s, string $opt): void
+    {
+        printf('<p><label>%s<br><input type="number" min="0" name="%s[pii_retention_days]" value="%d"></label>',
+            esc_html__('Datenaufbewahrung ausgegebener Portos (Tage)', 'wp-porto-sender'), esc_attr($opt), $s->piiRetentionDays());
+        printf('<br><span class="description">%s</span></p>',
+            esc_html__('Name und E-Mail ausgegebener Portos werden nach so vielen Tagen anonymisiert (der Datensatz und die Hashes bleiben für die Missbrauchsprüfung erhalten).', 'wp-porto-sender'));
+
+        printf('<p><label>%s<br><input type="number" min="0" name="%s[unconfirmed_retention_days]" value="%d"></label>',
+            esc_html__('Aufbewahrung unbestätigter Anfragen (Tage)', 'wp-porto-sender'), esc_attr($opt), $s->unconfirmedRetentionDays());
+        printf('<br><span class="description">%s</span></p>',
+            esc_html__('Nie bestätigte Anfragen werden so viele Tage aufbewahrt (für die Betrugs-/Missbrauchsprüfung) und danach gelöscht. Unabhängig von der Token-Gültigkeit — abgelaufene Links funktionieren weiterhin nicht.', 'wp-porto-sender'));
+    }
+
+    private function renderGeo(Settings $s, string $opt): void
+    {
         echo '<fieldset><legend>' . esc_html__('Geo-Beschränkung (nur Deutschland)', 'wp-porto-sender') . '</legend>';
         printf('<p><label><input type="checkbox" name="%1$s[geo_enabled]" value="1" %2$s> %3$s</label></p>',
             esc_attr($opt), checked($s->geoEnabled(), true, false),
@@ -134,15 +345,23 @@ final class SettingsPage
         printf('<p><label>%2$s<br><input type="password" name="%1$s[geo_api_key]" value="%3$s" autocomplete="new-password"></label></p>',
             esc_attr($opt), esc_html__('Geo-API Schlüssel', 'wp-porto-sender'), esc_attr($s->geoApiKey()));
         echo '</fieldset>';
-        submit_button();
-        echo '</form></div>';
+    }
 
-        // Client-side secret generator — fills the field using the browser's CSPRNG
-        // (Web Crypto getRandomValues). No server round-trip, so the plugin stays
-        // self-contained and no secret is transmitted; the admin saves via the form.
+    /**
+     * Inline generator + show/hide toggle for the HMAC secret field.
+     *
+     * The generator uses the browser's CSPRNG (Web Crypto getRandomValues) so no
+     * secret is transmitted and the plugin stays self-contained; the admin saves via
+     * the form. This stays inline (not in admin-settings.js) because it emits
+     * translatable labels via wp_json_encode.
+     */
+    private function renderSecretScript(): void
+    {
         $noCryptoMsg = wp_json_encode(
             __('Dein Browser unterstützt keine sichere Zufallserzeugung. Bitte trage das Secret manuell ein.', 'wp-porto-sender')
         );
+        $revealLabel = wp_json_encode(__('Anzeigen', 'wp-porto-sender'));
+        $hideLabel = wp_json_encode(__('Verbergen', 'wp-porto-sender'));
         ?>
         <script>
         (function () {
@@ -163,6 +382,16 @@ final class SettingsPage
                 field.dispatchEvent(new Event('change', { bubbles: true }));
                 field.focus();
             });
+            // Show/hide toggle: flip the masked field between password/text and
+            // swap the button label accordingly.
+            var revealBtn = document.getElementById('porto-altcha-reveal');
+            if (revealBtn) {
+                revealBtn.addEventListener('click', function () {
+                    var show = field.type === 'password';
+                    field.type = show ? 'text' : 'password';
+                    revealBtn.textContent = show ? <?php echo $hideLabel; ?> : <?php echo $revealLabel; ?>;
+                });
+            }
         })();
         </script>
         <?php

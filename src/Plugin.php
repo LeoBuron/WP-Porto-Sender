@@ -16,7 +16,7 @@ use PortoSender\Notifications\{AdminNotifier, WpNotifyThrottleStore};
 use PortoSender\Geo\{GeoGate, GeoProviderFactory};
 use PortoSender\Issuance\{IssuanceService, UrlConfirmLinkBuilder};
 use PortoSender\Rest\RestController;
-use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar};
+use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar, PageRenderer};
 use PortoSender\Admin\{SettingsPage, CodeIntakePage, Dashboard, ToolsPage};
 use PortoSender\Cron\Maintenance;
 
@@ -69,7 +69,8 @@ final class Plugin
         add_action('wp_enqueue_scripts', [$form, 'enqueueAssets']);
 
         (new RestController($issuance, self::captcha($s)))->register();
-        (new ConfirmHandler($issuance))->register();
+        (new ConfirmHandler($issuance, $s))->register();
+        (new PageRenderer($s))->register();
         (new BlockRegistrar($form))->register();
 
         $codes = new CodeRepository($wpdb);
@@ -78,9 +79,13 @@ final class Plugin
         (new Maintenance($codes, $requests, $alerter, $s, new SystemClock()))->register();
 
         if (is_admin()) {
+            // WordPress does not fire the activation hook on auto-update (this plugin's
+            // update path via GitHub Releases), so run any pending schema migration on the
+            // first admin load after an update. run() is version-gated → no-op once current.
+            (new SchemaVersion())->run($wpdb);
             (new SettingsPage())->register();
             (new CodeIntakePage($codes, $catalog))->register();
-            (new Dashboard($codes, $catalog, $s))->register();
+            (new Dashboard($codes, $s))->register();
             (new ToolsPage($codes, $requests))->register();
             // Guide the admin to export before removing the plugin (uninstall.php has no UI).
             add_filter('plugin_action_links_' . plugin_basename(self::$file), static function (array $links): array {

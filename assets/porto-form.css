@@ -1,0 +1,124 @@
+/**
+ * WP-Porto-Sender — front-end request form.
+ *
+ * Base styling plus three preset layouts (stacked / compact / card). Colours and
+ * spacing are driven by CSS custom properties that RequestForm::render() sets in a
+ * small scoped inline <style> from the plugin settings:
+ *   --porto-accent, --porto-btn-bg, --porto-btn-text, --porto-max-width, --porto-gap
+ * The declarations below double as fallbacks if that inline style is ever absent.
+ */
+
+.porto-request-form {
+  --porto-accent: #0b5fff;
+  --porto-btn-bg: #0b5fff;
+  --porto-btn-text: #ffffff;
+  --porto-max-width: 520px;
+  --porto-gap: 12px;
+
+  box-sizing: border-box;
+  max-width: var(--porto-max-width);
+  display: flex;
+  flex-direction: column;
+  gap: var(--porto-gap);
+}
+
+.porto-request-form *,
+.porto-request-form *::before,
+.porto-request-form *::after {
+  box-sizing: border-box;
+}
+
+.porto-request-form p {
+  margin: 0;
+}
+
+.porto-request-form label {
+  display: block;
+}
+
+.porto-request-form input[type="text"],
+.porto-request-form input[type="email"] {
+  width: 100%;
+  padding: 0.5em 0.6em;
+}
+
+.porto-request-form fieldset {
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  padding: 0.75em 1em;
+}
+
+.porto-request-form legend {
+  font-weight: 600;
+  padding: 0 0.4em;
+}
+
+.porto-request-form fieldset label {
+  font-weight: 400;
+}
+
+.porto-request-form .porto-intro {
+  margin: 0;
+}
+
+.porto-request-form a {
+  color: var(--porto-accent);
+}
+
+.porto-request-form input:focus-visible {
+  outline: 2px solid var(--porto-accent);
+  outline-offset: 1px;
+}
+
+.porto-request-form button[type="submit"] {
+  align-self: flex-start;
+  background: var(--porto-btn-bg);
+  color: var(--porto-btn-text);
+  border: 0;
+  border-radius: 6px;
+  padding: 0.6em 1.4em;
+  font-size: 1em;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.porto-request-form button[type="submit"]:hover {
+  filter: brightness(0.95);
+}
+
+.porto-request-form button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.porto-request-form .porto-message:not(:empty) {
+  padding: 0.6em 0.8em;
+  border-left: 4px solid var(--porto-accent);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Layout: Stacked (default) — comfortable vertical rhythm using --porto-gap as-is. */
+
+/* Layout: Compact — tighter spacing for dense pages/sidebars. */
+.porto-layout-compact {
+  gap: calc(var(--porto-gap) * 0.6);
+}
+
+.porto-layout-compact input[type="text"],
+.porto-layout-compact input[type="email"] {
+  padding: 0.35em 0.5em;
+}
+
+.porto-layout-compact fieldset {
+  padding: 0.5em 0.75em;
+}
+
+/* Layout: Card — boxed, elevated container. */
+.porto-layout-card {
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+}

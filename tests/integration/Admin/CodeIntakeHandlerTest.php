@@ -14,7 +14,7 @@ final class CodeIntakeHandlerTest extends PortoTestCase
         $repo = new CodeRepository($wpdb);
         $page = new CodeIntakePage($repo, ProductCatalog::default());
         $added = $page->handleSubmit([
-            'product' => 'grossbrief', 'value_cents' => '180',
+            'product' => 'grossbrief',
             'purchase_date' => '2026-06-01', 'codes' => "ONE\nTWO",
         ]);
         $this->assertSame(2, $added);

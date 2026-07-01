@@ -3,29 +3,17 @@ declare(strict_types=1);
 namespace PortoSender\Admin;
 
 use PortoSender\Inventory\CodeStore;
-use PortoSender\Postage\ProductCatalog;
 use PortoSender\Settings\Settings;
 
 final class Dashboard
 {
-    public function __construct(private CodeStore $codes, private ProductCatalog $catalog, private Settings $settings) {}
+    public function __construct(private CodeStore $codes, private Settings $settings) {}
 
     /** @return array<string,array{available:int,reserved:int,issued:int,expired:int}> */
     public function stockSummary(): array
     {
         $out = [];
         foreach ($this->settings->enabledProducts() as $key) { $out[$key] = $this->codes->countsByStatus($key); }
-        return $out;
-    }
-
-    /** @return array<string,array<object>> */
-    public function valueDrift(): array
-    {
-        $out = [];
-        foreach ($this->settings->enabledProducts() as $key) {
-            $product = $this->catalog->get($key);
-            if ($product !== null) { $out[$key] = $this->codes->findBelowValue($key, $product->valueCents); }
-        }
         return $out;
     }
 
@@ -63,11 +51,6 @@ final class Dashboard
                 esc_html($key), $c['available'], $c['reserved'], $c['issued'], $c['expired']);
         }
         echo '</tbody></table>';
-        foreach ($this->valueDrift() as $key => $rows) {
-            if ($rows === []) { continue; }
-            printf('<div class="notice notice-warning"><p>%s</p></div>',
-                esc_html(sprintf(__('%d "%s"-Codes liegen unter dem aktuellen Portowert.', 'wp-porto-sender'), count($rows), $key)));
-        }
         echo '</div>';
     }
 }
