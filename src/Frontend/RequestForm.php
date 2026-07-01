@@ -24,11 +24,11 @@ final class RequestForm
         $privacy = $this->settings->privacyPolicyUrl();
 
         ob_start(); ?>
-<form class="porto-request-form" data-endpoint="<?php echo esc_attr($restUrl); ?>">
+<form class="porto-request-form" data-endpoint="<?php echo esc_attr($restUrl); ?>" autocomplete="off">
   <p><label><?php echo esc_html__('Name', 'wp-porto-sender'); ?><br>
-    <input type="text" name="porto_name" required></label></p>
+    <input type="text" name="porto_name" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label></p>
   <p><label><?php echo esc_html__('E-Mail', 'wp-porto-sender'); ?><br>
-    <input type="email" name="porto_email" required></label></p>
+    <input type="email" name="porto_email" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label></p>
   <fieldset>
     <legend><?php echo esc_html__('Was möchtest du senden?', 'wp-porto-sender'); ?></legend>
     <?php foreach ($products as $p): ?>

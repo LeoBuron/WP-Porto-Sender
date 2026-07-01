@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.4.1
+Stable tag: 0.4.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.4.2 =
+* Fix: the public request form and captcha now work even when the whole REST API is restricted to logged-in users (e.g. the "Disable WP REST API" plugin). The plugin re-allows only its own two public routes (captcha challenge + form submit); the rest of the REST API stays locked. This was the real cause of the captcha "failing on smartphones" — logged-out visitors were being blocked with a 401.
+* Privacy: the name and e-mail fields are no longer offered from the browser's autofill/history (autocomplete off).
 
 = 0.4.1 =
 * Request form: show a processing state on submit (disabled button + status text) and block double submits.
