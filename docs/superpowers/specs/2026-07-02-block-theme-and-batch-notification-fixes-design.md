@@ -76,6 +76,23 @@ by email regardless.
    in the window, respecting the existing PII opt-in.
 3. No version bump here — release is the user's explicit decision.
 
+## Follow-up (0.5.3): content blank on block themes
+
+After 0.5.2, the built-in pages showed the theme header/footer/navigation but **no content** on the
+production site. Root cause: `themedDocument()` rendered the notice through `do_blocks()` (a synthetic
+`wp:group` wrapping freeform HTML) to pick up the theme's constrained width. `do_blocks()` renders the
+notice fine on a clean install (verified in wp-env), but a plugin that disables/filters block rendering
+— the production site runs several feature-disabling plugins — can blank that wrapper, while
+`block_header_area()`/`block_footer_area()` keep working (they render template parts directly). Symptom:
+chrome present, content gone.
+
+Fix: drop `do_blocks()` entirely. The notice is emitted directly inside a plain, inline-centred
+`<main class="porto-page" style="max-width:640px;margin:0 auto;padding:…">`, so nothing depends on block
+rendering. Also refreshed the default wording (and confirmed every page text stays editable on the Seiten
+tab): `text_page_sent` → "Wir haben deine Anfrage erhalten. …" and `text_status_issued` → "Du hast deine
+Mail-Adresse erfolgreich bestätigt. …". Because unchanged defaults normalise to `''`, the new wording
+reaches existing installs that never customised these fields.
+
 ## Review
 
 Adversarial multi-dimension review (correctness / security-privacy / wp-compat, find → verify).

@@ -65,14 +65,15 @@ final class SettingsEmailTemplatesTest extends WpUnitTestCase
     public function test_page_text_defaults_and_sanitize(): void
     {
         $s = new Settings();
-        $this->assertSame('Bitte bestätige die Anfrage über den Link in deiner E-Mail.', $s->text('text_page_sent'));
-        $this->assertSame('Dein Porto-Code wurde dir per E-Mail zugeschickt.', $s->text('text_status_issued'));
+        $this->assertSame(Settings::TEXT_DEFAULTS['text_page_sent'], $s->text('text_page_sent'));
+        $this->assertSame(Settings::TEXT_DEFAULTS['text_status_issued'], $s->text('text_status_issued'));
+        $this->assertNotSame('', $s->text('text_page_sent'));
 
         // Custom value round-trips through sanitize; empty falls back via text().
         $out = Settings::sanitize(['text_status_issued' => 'Juhu, dein Code kommt per E-Mail!']);
         $this->assertSame('Juhu, dein Code kommt per E-Mail!', $out['text_status_issued']);
         $this->assertSame('Juhu!', (new Settings(['text_status_issued' => 'Juhu!']))->text('text_status_issued'));
-        $this->assertSame('Dein Porto-Code wurde dir per E-Mail zugeschickt.',
+        $this->assertSame(Settings::TEXT_DEFAULTS['text_status_issued'],
             (new Settings(['text_status_issued' => '']))->text('text_status_issued'));
     }
 

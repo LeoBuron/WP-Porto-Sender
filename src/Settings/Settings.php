@@ -21,8 +21,8 @@ final class Settings
         'text_button' => 'Porto-Code anfordern',
         // Built-in "sent"/"result" page texts (Seiten tab). PageRenderer shows them on
         // the plugin's themed views and injects them as the notice on override pages.
-        'text_page_sent' => 'Bitte bestätige die Anfrage über den Link in deiner E-Mail.',
-        'text_status_issued' => 'Dein Porto-Code wurde dir per E-Mail zugeschickt.',
+        'text_page_sent' => 'Wir haben deine Anfrage erhalten. Eine Mail sollte zeitnah zu dir geschickt werden. Klicke auf den Link in der Mail, um den Code abzurufen.',
+        'text_status_issued' => 'Du hast deine Mail-Adresse erfolgreich bestätigt. Eine Mail mit dem Porto-Code ist auf dem Weg zu dir.',
         'text_status_already_issued' => 'Du hast deinen Porto-Code bereits erhalten.',
         'text_status_expired' => 'Dieser Bestätigungslink ist abgelaufen. Bitte stelle eine neue Anfrage.',
         'text_status_out_of_stock' => 'Aktuell sind keine Codes verfügbar. Bitte versuche es später erneut.',

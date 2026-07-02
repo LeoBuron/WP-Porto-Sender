@@ -40,13 +40,13 @@ Speichern auf den Standardtext zurück.
 
 ### Seite „Bitte E-Mail bestätigen"
 
-> Bitte bestätige die Anfrage über den Link in deiner E-Mail.
+> Wir haben deine Anfrage erhalten. Eine Mail sollte zeitnah zu dir geschickt werden. Klicke auf den Link in der Mail, um den Code abzurufen.
 
 ### Ergebnisseite — ein Text je Ausgang (`porto_status`)
 
 | Status | Bedeutung | Standardtext |
 |---|---|---|
-| `issued` | Erfolg, Code verschickt | Dein Porto-Code wurde dir per E-Mail zugeschickt. |
+| `issued` | Erfolg, Code verschickt | Du hast deine Mail-Adresse erfolgreich bestätigt. Eine Mail mit dem Porto-Code ist auf dem Weg zu dir. |
 | `already_issued` | Link erneut geklickt | Du hast deinen Porto-Code bereits erhalten. |
 | `expired` | Bestätigungslink abgelaufen | Dieser Bestätigungslink ist abgelaufen. Bitte stelle eine neue Anfrage. |
 | `out_of_stock` | Kein Vorrat | Aktuell sind keine Codes verfügbar. Bitte versuche es später erneut. |
