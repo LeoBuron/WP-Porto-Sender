@@ -167,6 +167,7 @@ final class IssuanceService
                 'remaining' => $this->codes->availableCount((string) $req->product, $now),
                 'name' => isset($req->name) ? (string) $req->name : null,
                 'email' => isset($req->email) ? (string) $req->email : null,
+                'time' => $now->getTimestamp(), // retrieval time, formatted per site timezone in the mail
             ]);
         } catch (\Throwable $e) {
             error_log('[wp-porto-sender] admin notification failed: ' . $e->getMessage());

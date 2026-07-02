@@ -21,7 +21,7 @@ final class AdminNotifySettingsTest extends WpUnitTestCase
     {
         $s = new Settings();
         $this->assertTrue($s->adminNotifyEnabled());
-        $this->assertFalse($s->adminNotifyIncludePii());
+        $this->assertTrue($s->adminNotifyIncludePii()); // default-on: mail ships with Zeit/Name/E-Mail
         $this->assertSame(15, $s->adminNotifyWindowMinutes());
     }
 

@@ -71,7 +71,7 @@ final class Settings
             'rate_limit_per_ip_day' => 3,
             'rate_limit_global_hour' => 20,
             'admin_notify_enabled' => true,
-            'admin_notify_include_pii' => false,
+            'admin_notify_include_pii' => true,
             'admin_notify_window_minutes' => 15,
             'geo_enabled' => false,
             'geo_provider' => 'cloudflare',

@@ -15,11 +15,22 @@ interface NotifyThrottleStore
     public function pending(): int;
     public function setPending(int $n): void;
 
-    /** @return list<array{name:string,email:string}> accumulated claimants for the pending batch */
+    /** @return list<array{name:string,email:string,time:int}> accumulated claimants for the pending batch */
     public function pendingRequesters(): array;
 
-    /** @param list<array{name:string,email:string}> $requesters */
+    /** @param list<array{name:string,email:string,time:int}> $requesters */
     public function setPendingRequesters(array $requesters): void;
+
+    /**
+     * The last accumulated claim's context (product + remaining stock), so a batch
+     * stranded past its window can be flushed as a complete mail by daily maintenance.
+     *
+     * @return array{product_label:string,remaining:int}|null null when no batch is pending
+     */
+    public function pendingContext(): ?array;
+
+    /** @param array{product_label:string,remaining:int}|null $ctx null clears it */
+    public function setPendingContext(?array $ctx): void;
 
     public function coolingDown(): bool;
     public function arm(int $seconds): void;
