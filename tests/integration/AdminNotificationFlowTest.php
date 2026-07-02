@@ -72,6 +72,60 @@ final class AdminNotificationFlowTest extends PortoTestCase
         $this->assertStringContainsString('Porto abgerufen', (string) $mail['subject']);
     }
 
+    public function test_batch_admin_notification_lists_every_claimant(): void
+    {
+        // End-to-end regression: several claims inside one throttle window must collapse
+        // into a single carry-over mail that names EVERY claimant (not just the last).
+        $this->captureMail();
+        global $wpdb;
+        $codes = new CodeRepository($wpdb);
+        $requests = new RequestRepository($wpdb);
+        $settings = new Settings([
+            'enabled_products' => ['grossbrief'], 'owner_address' => 'Leo',
+            'alert_email' => 'admin@example.de', 'admin_notify_enabled' => true,
+            'admin_notify_include_pii' => true, 'admin_notify_window_minutes' => 15,
+            'rate_limit_enabled' => false,
+        ]);
+        $hasher = new Hasher('salt');
+        $notifier = new AdminNotifier($settings, new Mailer($settings), new WpNotifyThrottleStore());
+        $svc = new IssuanceService(
+            new NullVerifier(), new RequestLimiter($requests),
+            new RateLimiter(new TransientRateCounterStore(), $settings, new SystemClock()),
+            $codes, $requests, new Mailer($settings), $hasher, new TokenGenerator(),
+            new UrlConfirmLinkBuilder(), $settings, ProductCatalog::default(), new SystemClock(), $notifier
+        );
+        $codes->addBatch('grossbrief', new \DateTimeImmutable('2026-01-01'), ['C1', 'C2', 'C3', 'C4']);
+
+        $claim = function (string $name, string $email, string $token) use ($requests, $hasher, $svc): string {
+            $requests->createPending([
+                'name' => $name, 'email' => $email,
+                'email_hash' => $hasher->email($email), 'name_hash' => $hasher->name($name),
+                'product' => 'grossbrief', 'token_hash' => $hasher->token($token),
+                'ip_hash' => null, 'created_at' => (new SystemClock())->now()->format('Y-m-d H:i:s'),
+            ]);
+            return $svc->confirm($token)['status'];
+        };
+
+        $this->assertSame('issued', $claim('Vera', 'v@example.de', 'TOK1')); // leading edge -> mail #1
+        $this->assertSame('issued', $claim('Bob', 'b@example.de', 'TOK2'));  // cooling -> accumulate
+        $this->assertSame('issued', $claim('Cara', 'c@example.de', 'TOK3')); // cooling -> accumulate
+
+        $adminMails = array_values(array_filter($this->mails, fn($m) => ($m['to'] ?? '') === 'admin@example.de'));
+        $this->assertCount(1, $adminMails, 'burst collapses to a single leading-edge mail');
+        $this->assertStringContainsString('Anfrage von: Vera <v@example.de>', (string) $adminMails[0]['message']);
+
+        // Window elapses; the next claim flushes the accumulated batch.
+        delete_transient(WpNotifyThrottleStore::COOLDOWN_TRANSIENT);
+        $this->assertSame('issued', $claim('Dan', 'd@example.de', 'TOK4')); // carry-over -> mail #2
+
+        $adminMails = array_values(array_filter($this->mails, fn($m) => ($m['to'] ?? '') === 'admin@example.de'));
+        $this->assertCount(2, $adminMails, 'exactly one carry-over mail for the batch');
+        $batch = (string) $adminMails[1]['message'];
+        $this->assertStringContainsString('- Bob <b@example.de>', $batch);
+        $this->assertStringContainsString('- Cara <c@example.de>', $batch);
+        $this->assertStringContainsString('- Dan <d@example.de>', $batch);
+    }
+
     public function test_no_admin_notification_when_disabled(): void
     {
         $this->captureMail();

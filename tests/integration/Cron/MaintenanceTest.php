@@ -5,6 +5,7 @@ use Mockery;
 use PortoSender\Tests\integration\PortoTestCase;
 use PortoSender\Cron\Maintenance;
 use PortoSender\Inventory\{CodeRepository, StockAlerter};
+use PortoSender\Notifications\{AdminNotifier, WpNotifyThrottleStore};
 use PortoSender\Requests\RequestRepository;
 use PortoSender\Mail\Mailer;
 use PortoSender\Settings\Settings;
@@ -34,5 +35,28 @@ final class MaintenanceTest extends PortoTestCase
         $this->assertSame(1, $codes->countsByStatus('grossbrief')['expired']);
         // The unconfirmed request is ~23 days old > the 7-day retention window -> purged.
         $this->assertNull($requests->findByTokenHash(str_repeat('c', 64)));
+    }
+
+    public function test_run_purges_a_stale_pending_notification_batch(): void
+    {
+        global $wpdb;
+        $codes = new CodeRepository($wpdb);
+        $requests = new RequestRepository($wpdb);
+        $settings = new Settings(['enabled_products' => ['grossbrief'], 'alert_email' => 'a@b.de', 'admin_notify_include_pii' => true]);
+        $clock = Mockery::mock(Clock::class);
+        $clock->shouldReceive('now')->andReturn(new \DateTimeImmutable('2026-06-24 03:00:00'));
+        $alerter = new StockAlerter($codes, $settings, new Mailer($settings), ProductCatalog::default(), $clock);
+
+        // A batch accumulated claimant PII but was never flushed and its cooldown has elapsed.
+        $store = new WpNotifyThrottleStore();
+        $store->setPending(2);
+        $store->setPendingRequesters([['name' => 'Bob', 'email' => 'b@e.de'], ['name' => 'Cara', 'email' => 'c@e.de']]);
+        delete_transient(WpNotifyThrottleStore::COOLDOWN_TRANSIENT); // not cooling
+
+        $notifier = new AdminNotifier($settings, new Mailer($settings), $store);
+        (new Maintenance($codes, $requests, $alerter, $settings, $clock, $notifier))->run();
+
+        $this->assertSame(0, $store->pending(), 'stale count dropped');
+        $this->assertSame([], $store->pendingRequesters(), 'stale claimant PII purged');
     }
 }

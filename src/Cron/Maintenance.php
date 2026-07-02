@@ -4,6 +4,7 @@ namespace PortoSender\Cron;
 
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Inventory\StockAlerter;
+use PortoSender\Notifications\AdminNotifier;
 use PortoSender\Requests\RequestStore;
 use PortoSender\Settings\Settings;
 use PortoSender\Support\Clock;
@@ -18,6 +19,7 @@ final class Maintenance
         private StockAlerter $alerter,
         private Settings $settings,
         private Clock $clock,
+        private ?AdminNotifier $notifier = null,
     ) {}
 
     public function register(): void
@@ -34,6 +36,8 @@ final class Maintenance
         // Token EXPIRY is separate (confirm() rejects tokens past confirm_token_ttl_hours).
         $this->requests->deleteUnconfirmedOlderThan($now->modify('-' . $this->settings->unconfirmedRetentionDays() . ' days'));
         $this->requests->anonymizeOlderThan($now->modify('-' . $this->settings->piiRetentionDays() . ' days'));
+        // Bound admin-notification PII at rest: drop a batch left un-flushed after its window.
+        $this->notifier?->purgeStalePendingBatch();
         $this->alerter->evaluate();
     }
 }

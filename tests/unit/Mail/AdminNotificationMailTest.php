@@ -44,6 +44,61 @@ final class AdminNotificationMailTest extends WpUnitTestCase
         $this->assertStringContainsString('Anfrage von: Vera <vera@example.de>', $c['body']);
     }
 
+    public function test_batch_lists_every_requester_in_default_body(): void
+    {
+        $mailer = new Mailer(new Settings());
+        $c = $this->capture(fn() => $mailer->sendAdminNotification('admin@example.de', [
+            'product_label' => 'Standardbrief', 'count' => 3, 'remaining' => 4,
+            'requesters' => [
+                ['name' => 'Vera', 'email' => 'v@e.de'],
+                ['name' => 'Bob', 'email' => 'b@e.de'],
+                ['name' => 'Cara', 'email' => 'c@e.de'],
+            ],
+        ]));
+
+        $this->assertStringContainsString('Anfragen:', $c['body']);
+        $this->assertStringContainsString('- Vera <v@e.de>', $c['body']);
+        $this->assertStringContainsString('- Bob <b@e.de>', $c['body']);
+        $this->assertStringContainsString('- Cara <c@e.de>', $c['body']);
+        // The single-claimant wording is not used for a batch.
+        $this->assertStringNotContainsString('Anfrage von:', $c['body']);
+    }
+
+    public function test_single_requester_via_list_keeps_one_line_wording(): void
+    {
+        $mailer = new Mailer(new Settings());
+        $c = $this->capture(fn() => $mailer->sendAdminNotification('admin@example.de', [
+            'product_label' => 'Großbrief', 'count' => 1, 'remaining' => 3,
+            'requesters' => [['name' => 'Vera', 'email' => 'vera@example.de']],
+        ]));
+        $this->assertStringContainsString('Anfrage von: Vera <vera@example.de>', $c['body']);
+    }
+
+    public function test_custom_template_requests_placeholder_lists_batch(): void
+    {
+        $mailer = new Mailer(new Settings([
+            'email_admin_body' => "Abrufe (%count%):\n%requests%",
+        ]));
+        $c = $this->capture(fn() => $mailer->sendAdminNotification('admin@example.de', [
+            'product_label' => 'Standardbrief', 'count' => 2, 'remaining' => 7,
+            'requesters' => [
+                ['name' => 'Vera', 'email' => 'v@e.de'],
+                ['name' => 'Bob', 'email' => 'b@e.de'],
+            ],
+        ]));
+        $this->assertSame("Abrufe (2):\n- Vera <v@e.de>\n- Bob <b@e.de>", $c['body']);
+    }
+
+    public function test_empty_requesters_list_stays_pii_free(): void
+    {
+        $mailer = new Mailer(new Settings());
+        $c = $this->capture(fn() => $mailer->sendAdminNotification('admin@example.de', [
+            'product_label' => 'Standardbrief', 'count' => 2, 'remaining' => 7, 'requesters' => [],
+        ]));
+        $this->assertStringNotContainsString('Anfrage von', $c['body']);
+        $this->assertStringNotContainsString('Anfragen:', $c['body']);
+    }
+
     public function test_custom_template_resolves_pii_placeholders_when_present(): void
     {
         $mailer = new Mailer(new Settings([

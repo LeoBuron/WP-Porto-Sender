@@ -76,7 +76,8 @@ final class Plugin
         $codes = new CodeRepository($wpdb);
         $requests = new RequestRepository($wpdb);
         $alerter = new StockAlerter($codes, $s, new Mailer($s), $catalog, new SystemClock());
-        (new Maintenance($codes, $requests, $alerter, $s, new SystemClock()))->register();
+        $notifier = new AdminNotifier($s, new Mailer($s), new WpNotifyThrottleStore());
+        (new Maintenance($codes, $requests, $alerter, $s, new SystemClock(), $notifier))->register();
 
         if (is_admin()) {
             // WordPress does not fire the activation hook on auto-update (this plugin's

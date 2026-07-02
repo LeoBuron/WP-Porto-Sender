@@ -64,6 +64,38 @@ final class PageTextsTest extends PortoTestCase
         $this->assertLessThan(strpos($out, 'Seiteninhalt'), strpos($out, 'Schau in dein Postfach!'));
     }
 
+    public function test_builtin_view_renders_block_theme_chrome_without_compat_fallback(): void
+    {
+        // Regression: get_header()/get_footer() on a block theme fall back to the ancient
+        // theme-compat templates (no chrome + a deprecation notice). The built-in view must
+        // render the real block header/footer instead.
+        $theme = wp_get_theme('twentytwentyfive');
+        if (!$theme->exists()) {
+            $this->markTestSkipped('twentytwentyfive (a block theme) not installed');
+        }
+        $original = get_stylesheet();
+        switch_theme('twentytwentyfive');
+        try {
+            $this->assertTrue(wp_is_block_theme(), 'expected a block theme to be active');
+            $settings = $this->saveSettings(['text_page_sent' => 'Schau in dein Postfach!']);
+            $m = new \ReflectionMethod(PageRenderer::class, 'themedDocument');
+            $html = (string) $m->invoke(new PageRenderer($settings), 'Schau in dein Postfach!');
+
+            $this->assertStringContainsString('<!DOCTYPE html>', $html);
+            $this->assertStringContainsString('Schau in dein Postfach!', $html);
+            $this->assertStringContainsString('porto-notice', $html);
+            // Took the block-theme branch (our assembled shell), not get_header()/get_footer():
+            // the body carries the class our block document adds, and none of the ancient
+            // theme-compat fallback markers appear. (The real header/footer template parts
+            // render over HTTP; switch_theme() mid-request doesn't fully load them here.)
+            $this->assertStringContainsString('porto-builtin-page', $html);
+            $this->assertStringNotContainsString('proudly powered by', $html);
+            $this->assertStringNotContainsString('Michael Heilemann', $html);
+        } finally {
+            switch_theme($original);
+        }
+    }
+
     public function test_shortcode_in_status_text_is_not_expanded_on_override_page(): void
     {
         // A registered shortcode typed into a status text must NOT execute when the notice
