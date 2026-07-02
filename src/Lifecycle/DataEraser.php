@@ -39,6 +39,7 @@ final class DataEraser
         delete_option(Settings::OPTION);
         delete_option(SchemaVersion::OPTION);
         delete_option(WpNotifyThrottleStore::PENDING_OPTION);
+        delete_option(WpNotifyThrottleStore::REQUESTERS_OPTION);
 
         // Fixed-key transient via the API (also correct on object-cache-backed sites).
         delete_transient(WpNotifyThrottleStore::COOLDOWN_TRANSIENT);

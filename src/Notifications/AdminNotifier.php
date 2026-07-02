@@ -39,15 +39,38 @@ final class AdminNotifier
             return; // no recipient configured
         }
 
+        // Only carry PII (name/email) into the batch when the admin opted in; otherwise the
+        // notification stays PII-free and just reports counts.
+        $requester = null;
+        if ($this->settings->adminNotifyIncludePii()) {
+            $name = trim((string) ($ctx['name'] ?? ''));
+            $email = trim((string) ($ctx['email'] ?? ''));
+            if ($name !== '' || $email !== '') {
+                $requester = ['name' => $name, 'email' => $email];
+            }
+        }
+
         $windowMinutes = $this->settings->adminNotifyWindowMinutes();
         if ($windowMinutes <= 0) {
-            $this->send($to, $ctx, 1);
+            $this->send($to, $ctx, 1, $requester !== null ? [$requester] : []);
+            // Throttling is off now; drop any batch stranded by a former windowed period so
+            // its accumulated claimant PII is not left at rest.
+            $this->discardPending();
             return;
         }
 
         $pending = $this->store->pending() + 1;
+        // Re-gate the accumulated list on the CURRENT setting: if the admin switched PII off
+        // mid-window, never carry (or re-persist) previously accumulated claimant PII — the
+        // mail stays PII-free per the class contract, and toggling off purges the stored list.
+        $requesters = $this->settings->adminNotifyIncludePii() ? $this->store->pendingRequesters() : [];
+        if ($requester !== null) {
+            $requesters[] = $requester;
+        }
+
         if ($this->store->coolingDown()) {
             $this->store->setPending($pending); // accumulate, don't mail
+            $this->store->setPendingRequesters($requesters); // [] when PII off → option deleted
             return;
         }
 
@@ -55,23 +78,48 @@ final class AdminNotifier
         // SMTP plugin that raises rather than returning false), pending stays accumulated and
         // the cooldown is not armed, so the burst remains retryable on the next event instead
         // of being silently swallowed for a whole window.
-        $this->send($to, $ctx, $pending);
+        $this->send($to, $ctx, $pending, $requesters);
         $this->store->setPending(0);
+        $this->store->setPendingRequesters([]);
         $this->store->arm($windowMinutes * 60);
     }
 
     /**
-     * @param array{product_label:string,remaining:int,name:?string,email:?string} $ctx
+     * Daily-maintenance seam: drop a batch left un-flushed after its window elapsed (e.g. the
+     * site went quiet before the next claim could carry it over). Bounds accumulated claimant
+     * PII to at most one maintenance cycle instead of retaining it indefinitely. A batch still
+     * inside its cooldown is left alone — the next claim will flush it normally.
      */
-    private function send(string $to, array $ctx, int $count): void
+    public function purgeStalePendingBatch(): void
     {
-        $includePii = $this->settings->adminNotifyIncludePii();
+        if ($this->store->coolingDown()) {
+            return;
+        }
+        $this->discardPending();
+    }
+
+    /** Reset the pending batch state (count + accumulated claimants) if anything is stored. */
+    private function discardPending(): void
+    {
+        if ($this->store->pending() !== 0) {
+            $this->store->setPending(0);
+        }
+        if ($this->store->pendingRequesters() !== []) {
+            $this->store->setPendingRequesters([]);
+        }
+    }
+
+    /**
+     * @param array{product_label:string,remaining:int,name:?string,email:?string} $ctx
+     * @param list<array{name:string,email:string}> $requesters claimants for this batch (empty when PII off)
+     */
+    private function send(string $to, array $ctx, int $count, array $requesters): void
+    {
         $this->mailer->sendAdminNotification($to, [
             'product_label' => (string) $ctx['product_label'],
             'count' => $count,
             'remaining' => (int) $ctx['remaining'],
-            'name' => $includePii ? ($ctx['name'] ?? null) : null,
-            'email' => $includePii ? ($ctx['email'] ?? null) : null,
+            'requesters' => $requesters,
         ]);
     }
 }

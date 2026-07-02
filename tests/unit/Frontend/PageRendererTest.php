@@ -30,6 +30,50 @@ final class PageRendererTest extends WpUnitTestCase
         return new PageRenderer(new Settings($settings));
     }
 
+    /** Invoke the private document builder (renderThemed() itself calls exit). */
+    private function buildDocument(PageRenderer $r, string $message): string
+    {
+        // PHP 8.1+ reflection accesses private methods without setAccessible().
+        return (string) (new \ReflectionMethod($r, 'themedDocument'))->invoke($r, $message);
+    }
+
+    public function test_builtin_view_uses_block_template_parts_for_block_themes(): void
+    {
+        // Block themes have no header.php/footer.php — get_header()/get_footer() must NOT
+        // be used (they fall back to the bare theme-compat page). We assemble the document
+        // from the block header/footer areas instead.
+        Functions\when('wp_is_block_theme')->justReturn(true);
+        Functions\when('do_blocks')->returnArg(1);
+        Functions\when('language_attributes')->justReturn(null);
+        Functions\when('bloginfo')->justReturn(null);
+        Functions\when('body_class')->justReturn(null);
+        Functions\expect('wp_head')->atLeast()->once();
+        Functions\expect('wp_body_open')->atLeast()->once();
+        Functions\expect('block_header_area')->once();
+        Functions\expect('block_footer_area')->once();
+        Functions\expect('wp_footer')->atLeast()->once();
+        Functions\expect('get_header')->never();
+        Functions\expect('get_footer')->never();
+
+        $html = $this->buildDocument($this->renderer(), 'Bitte bestätigen');
+        $this->assertStringContainsString('<!DOCTYPE html>', $html);
+        $this->assertStringContainsString('porto-notice', $html);
+        $this->assertStringContainsString('Bitte bestätigen', $html);
+    }
+
+    public function test_builtin_view_uses_get_header_footer_for_classic_themes(): void
+    {
+        Functions\when('wp_is_block_theme')->justReturn(false);
+        Functions\expect('get_header')->once();
+        Functions\expect('get_footer')->once();
+        Functions\expect('block_header_area')->never();
+        Functions\expect('block_footer_area')->never();
+
+        $html = $this->buildDocument($this->renderer(), 'Klassisch');
+        $this->assertStringContainsString('porto-notice', $html);
+        $this->assertStringContainsString('Klassisch', $html);
+    }
+
     public function test_known_statuses_map_to_their_messages(): void
     {
         $r = $this->renderer();

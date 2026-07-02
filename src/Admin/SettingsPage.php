@@ -265,7 +265,7 @@ final class SettingsPage
         $messages = [
             'confirm'    => [__('Bestätigung (Double-Opt-In)', 'wp-porto-sender'), ['%name%', '%confirm_url%']],
             'delivery'   => [__('Zustellung (der Code)', 'wp-porto-sender'), ['%name%', '%product%', '%limits%', '%code%', '%owner_address%']],
-            'admin'      => [__('Admin-Benachrichtigung', 'wp-porto-sender'), ['%product%', '%count%', '%remaining%', '%name%', '%email%']],
+            'admin'      => [__('Admin-Benachrichtigung', 'wp-porto-sender'), ['%product%', '%count%', '%remaining%', '%name%', '%email%', '%requests%']],
             'lowstock'   => [__('Geringer Bestand', 'wp-porto-sender'), ['%product%', '%remaining%']],
             'outofstock' => [__('Kein Bestand', 'wp-porto-sender'), ['%product%']],
         ];
@@ -286,7 +286,7 @@ final class SettingsPage
             ));
             printf('<p class="description">%s %s</p>', esc_html__('Platzhalter:', 'wp-porto-sender'), $codes);
             if ($key === 'admin') {
-                printf('<p class="description">%s</p>', esc_html__('%name% und %email% werden nur eingesetzt, wenn im Tab „Missbrauchsschutz" die Option „Name und E-Mail mitsenden" aktiviert ist – sonst bleiben sie leer. Solange dieser Text unverändert bleibt, hängt das Plugin bei aktivierter Option automatisch eine Zeile mit Name und E-Mail des Anfragenden an.', 'wp-porto-sender'));
+                printf('<p class="description">%s</p>', esc_html__('%name% und %email% (erste Anfrage) sowie %requests% (alle Anfragen eines Sammel-Zeitfensters, je Zeile eine) werden nur eingesetzt, wenn im Tab „Missbrauchsschutz" die Option „Name und E-Mail mitsenden" aktiviert ist – sonst bleiben sie leer. Solange dieser Text unverändert bleibt, hängt das Plugin bei aktivierter Option automatisch eine Zeile je Anfrage mit Name und E-Mail an.', 'wp-porto-sender'));
             }
             echo '</fieldset>';
         }

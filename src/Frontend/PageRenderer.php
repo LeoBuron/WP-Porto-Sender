@@ -109,9 +109,54 @@ final class PageRenderer
 
     private function renderThemed(string $message): void
     {
-        get_header();
-        echo '<main class="porto-page">' . $this->notice($message) . '</main>';
-        get_footer();
+        echo $this->themedDocument($message);
         exit;
+    }
+
+    /**
+     * Build the full themed HTML document for a built-in view.
+     *
+     * Classic themes use get_header()/get_footer(). Block themes (the WordPress default
+     * since Twenty Twenty-Two, and what most sites now run) have no header.php/footer.php,
+     * so those calls fall back to the ancient theme-compat templates — a page with none of
+     * the site's real header, navigation, footer or styling (plus a PHP deprecation notice),
+     * which looks empty/broken. For block themes we instead assemble the document from the
+     * theme's block header/footer template parts and render the notice inside a constrained
+     * group so it picks up the theme's content width. Kept separate from the echo/exit so
+     * it stays unit-testable.
+     */
+    private function themedDocument(string $message): string
+    {
+        $notice = $this->notice($message);
+        ob_start();
+        if (wp_is_block_theme()) {
+            $main = do_blocks(
+                '<!-- wp:group {"tagName":"main","layout":{"type":"constrained"}} -->'
+                . '<main class="wp-block-group porto-page">' . $notice . '</main>'
+                . '<!-- /wp:group -->'
+            );
+            ?>
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+<meta charset="<?php bloginfo('charset'); ?>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<?php wp_head(); ?>
+</head>
+<body <?php body_class('porto-builtin-page'); ?>>
+<?php wp_body_open(); ?>
+<?php block_header_area(); ?>
+<?php echo $main; ?>
+<?php block_footer_area(); ?>
+<?php wp_footer(); ?>
+</body>
+</html>
+            <?php
+        } else {
+            get_header();
+            echo '<main class="porto-page">' . $notice . '</main>';
+            get_footer();
+        }
+        return (string) ob_get_clean();
     }
 }

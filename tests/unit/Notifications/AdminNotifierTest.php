@@ -10,10 +10,14 @@ use PortoSender\Settings\Settings;
 final class FakeNotifyStore implements NotifyThrottleStore
 {
     public int $pending = 0;
+    /** @var list<array{name:string,email:string}> */
+    public array $requesters = [];
     public bool $cooling = false;
     public ?int $armedSeconds = null;
     public function pending(): int { return $this->pending; }
     public function setPending(int $n): void { $this->pending = $n; }
+    public function pendingRequesters(): array { return $this->requesters; }
+    public function setPendingRequesters(array $requesters): void { $this->requesters = array_values($requesters); }
     public function coolingDown(): bool { return $this->cooling; }
     public function arm(int $seconds): void { $this->armedSeconds = $seconds; $this->cooling = true; }
     /** Simulate the cooldown transient expiring (the real store auto-expires). */
@@ -66,7 +70,7 @@ final class AdminNotifierTest extends WpUnitTestCase
         $this->assertSame(1, $this->sent[0]['data']['count']);
         $this->assertSame(7, $this->sent[0]['data']['remaining']);
         $this->assertSame(900, $store->armedSeconds); // 15 * 60
-        $this->assertNull($this->sent[0]['data']['name']); // PII off
+        $this->assertSame([], $this->sent[0]['data']['requesters']); // PII off
     }
 
     public function test_burst_within_window_sends_one_then_accumulates_pending(): void
@@ -139,13 +143,126 @@ final class AdminNotifierTest extends WpUnitTestCase
         $this->assertSame(1, $this->sent[1]['data']['count']);
     }
 
-    public function test_include_pii_passes_name_and_email(): void
+    public function test_include_pii_passes_requester(): void
     {
         $store = new FakeNotifyStore();
         $this->notifier(new Settings(['alert_email' => 'a@b.de', 'admin_notify_window_minutes' => 0, 'admin_notify_include_pii' => true]), $store)
             ->onIssued($this->ctx(['name' => 'Vera', 'email' => 'v@e.de']));
 
-        $this->assertSame('Vera', $this->sent[0]['data']['name']);
-        $this->assertSame('v@e.de', $this->sent[0]['data']['email']);
+        $this->assertSame([['name' => 'Vera', 'email' => 'v@e.de']], $this->sent[0]['data']['requesters']);
+    }
+
+    public function test_pii_off_never_accumulates_requesters(): void
+    {
+        $store = new FakeNotifyStore();
+        $n = $this->notifier(new Settings(['alert_email' => 'a@b.de', 'admin_notify_window_minutes' => 15, 'admin_notify_include_pii' => false]), $store);
+        $n->onIssued($this->ctx(['name' => 'Vera', 'email' => 'v@e.de'])); // leading edge
+        $n->onIssued($this->ctx(['name' => 'Bob', 'email' => 'b@e.de']));  // cooling
+
+        $this->assertSame([], $this->sent[0]['data']['requesters']);
+        $this->assertSame([], $store->requesters, 'no PII stored when the opt-in is off');
+    }
+
+    public function test_burst_with_pii_lists_every_claimant_in_the_carry_over_mail(): void
+    {
+        $store = new FakeNotifyStore();
+        $n = $this->notifier(new Settings(['alert_email' => 'a@b.de', 'admin_notify_window_minutes' => 15, 'admin_notify_include_pii' => true]), $store);
+
+        $n->onIssued($this->ctx(['name' => 'Vera', 'email' => 'v@e.de'])); // leading edge -> mail #1 (Vera)
+        $n->onIssued($this->ctx(['name' => 'Bob', 'email' => 'b@e.de']));  // cooling -> accumulate
+        $n->onIssued($this->ctx(['name' => 'Cara', 'email' => 'c@e.de'])); // cooling -> accumulate
+
+        // Leading-edge mail names only the first claimant; the rest are pending.
+        $this->assertSame([['name' => 'Vera', 'email' => 'v@e.de']], $this->sent[0]['data']['requesters']);
+        $this->assertSame(
+            [['name' => 'Bob', 'email' => 'b@e.de'], ['name' => 'Cara', 'email' => 'c@e.de']],
+            $store->requesters
+        );
+
+        $store->expire();
+        $n->onIssued($this->ctx(['name' => 'Dan', 'email' => 'd@e.de'])); // carry-over -> mail #2 lists Bob, Cara, Dan
+
+        $this->assertCount(2, $this->sent);
+        $this->assertSame(3, $this->sent[1]['data']['count']);
+        $this->assertSame(
+            [
+                ['name' => 'Bob', 'email' => 'b@e.de'],
+                ['name' => 'Cara', 'email' => 'c@e.de'],
+                ['name' => 'Dan', 'email' => 'd@e.de'],
+            ],
+            $this->sent[1]['data']['requesters']
+        );
+        $this->assertSame([], $store->requesters, 'requester list reset after the batch mail');
+    }
+
+    public function test_disabling_pii_mid_window_stops_and_purges_accumulated_pii(): void
+    {
+        // A burst accumulates claimant PII while the opt-in is on; the admin then turns it off.
+        $store = new FakeNotifyStore();
+        $store->pending = 2;
+        $store->requesters = [['name' => 'Bob', 'email' => 'b@e.de'], ['name' => 'Cara', 'email' => 'c@e.de']];
+        $store->cooling = false; // window elapsed → next claim is a carry-over send
+
+        $this->notifier(new Settings(['alert_email' => 'a@b.de', 'admin_notify_window_minutes' => 15, 'admin_notify_include_pii' => false]), $store)
+            ->onIssued($this->ctx(['name' => 'Dan', 'email' => 'd@e.de']));
+
+        // The carry-over mail must NOT leak the previously accumulated PII.
+        $this->assertCount(1, $this->sent);
+        $this->assertSame(3, $this->sent[0]['data']['count'], 'count still reflects the burst');
+        $this->assertSame([], $this->sent[0]['data']['requesters'], 'PII off → no claimants sent');
+        $this->assertSame([], $store->requesters, 'accumulated PII purged from the store');
+    }
+
+    public function test_disabling_pii_mid_window_purges_during_cooldown(): void
+    {
+        $store = new FakeNotifyStore();
+        $store->pending = 1;
+        $store->requesters = [['name' => 'Bob', 'email' => 'b@e.de']];
+        $store->cooling = true; // still within the window → accumulate, don't send
+
+        $this->notifier(new Settings(['alert_email' => 'a@b.de', 'admin_notify_window_minutes' => 15, 'admin_notify_include_pii' => false]), $store)
+            ->onIssued($this->ctx(['name' => 'Cara', 'email' => 'c@e.de']));
+
+        $this->assertCount(0, $this->sent, 'still cooling — no mail');
+        $this->assertSame([], $store->requesters, 'PII off purges the accumulated list');
+        $this->assertSame(2, $store->pending, 'count still accumulates');
+    }
+
+    public function test_window_zero_drains_a_batch_stranded_by_a_former_window(): void
+    {
+        $store = new FakeNotifyStore();
+        $store->pending = 2;
+        $store->requesters = [['name' => 'Bob', 'email' => 'b@e.de'], ['name' => 'Cara', 'email' => 'c@e.de']];
+
+        $this->notifier(new Settings(['alert_email' => 'a@b.de', 'admin_notify_window_minutes' => 0, 'admin_notify_include_pii' => true]), $store)
+            ->onIssued($this->ctx(['name' => 'Dan', 'email' => 'd@e.de']));
+
+        // The current claim is reported on its own; the stranded batch's PII is dropped.
+        $this->assertCount(1, $this->sent);
+        $this->assertSame(1, $this->sent[0]['data']['count']);
+        $this->assertSame([['name' => 'Dan', 'email' => 'd@e.de']], $this->sent[0]['data']['requesters']);
+        $this->assertSame(0, $store->pending);
+        $this->assertSame([], $store->requesters);
+    }
+
+    public function test_purge_stale_pending_batch_clears_only_when_not_cooling(): void
+    {
+        $store = new FakeNotifyStore();
+        $store->pending = 2;
+        $store->requesters = [['name' => 'Bob', 'email' => 'b@e.de']];
+
+        $n = $this->notifier(new Settings(['alert_email' => 'a@b.de']), $store);
+
+        // Still cooling → leave the batch for the next claim to flush.
+        $store->cooling = true;
+        $n->purgeStalePendingBatch();
+        $this->assertSame(2, $store->pending);
+        $this->assertSame([['name' => 'Bob', 'email' => 'b@e.de']], $store->requesters);
+
+        // Window elapsed → drop the stranded batch (bounds PII at rest).
+        $store->cooling = false;
+        $n->purgeStalePendingBatch();
+        $this->assertSame(0, $store->pending);
+        $this->assertSame([], $store->requesters);
     }
 }

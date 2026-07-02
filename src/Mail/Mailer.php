@@ -50,37 +50,90 @@ final class Mailer implements MailerInterface
     }
 
     /**
-     * Notify the admin that visitor(s) claimed a porto code. PII-free by default;
-     * name/email are resolved (and appended in the default template) only when the
-     * caller supplies them — the AdminNotifier passes null unless the opt-in setting
-     * is on, so a custom template's %name%/%email% resolve to '' when PII is off.
+     * Notify the admin that visitor(s) claimed a porto code. PII-free by default; the
+     * claimants (name/email) are included only when the caller passes them — the
+     * AdminNotifier passes an empty list unless the opt-in setting is on.
      *
-     * @param array{product_label:string,count:int,remaining:int,name:?string,email:?string} $data
+     * A batch (several claims collapsed into one throttled mail) lists every claimant:
+     * the default body appends one line per requester, and custom templates can use
+     * %requests% for the full list. %name%/%email% resolve to the first claimant (so
+     * count=1 templates keep working) and are '' when PII is off.
+     *
+     * @param array{product_label:string,count:int,remaining:int,
+     *     requesters?:list<array{name:string,email:string}>,name?:?string,email?:?string} $data
      */
     public function sendAdminNotification(string $to, array $data): bool
     {
-        $name = $data['name'] ?? null;
-        $email = $data['email'] ?? null;
-        $hasPii = $name !== null && $name !== '' && $email !== null && $email !== '';
+        $requesters = $this->normalizeRequesters($data);
+        $first = $requesters[0] ?? ['name' => '', 'email' => ''];
 
         $vars = [
             '%product%' => (string) $data['product_label'],
             '%count%' => (string) (int) $data['count'],
             '%remaining%' => (string) (int) $data['remaining'],
-            '%name%' => $hasPii ? (string) $name : '',
-            '%email%' => $hasPii ? (string) $email : '',
+            '%name%' => $first['name'],
+            '%email%' => $first['email'],
+            '%requests%' => implode("\n", array_map(
+                fn (array $r): string => '- ' . $this->formatRequester($r),
+                $requesters
+            )),
         ];
 
-        // The default body only carries the "Anfrage von" line when PII is present, so
-        // the PII-free default never renders an empty "Anfrage von:  <>". A custom
-        // template may reference %name%/%email% directly (they resolve to '' when off).
+        // The default body carries claimant lines only when PII is present, so the
+        // PII-free default never renders an empty "Anfrage von:  <>". A single claimant
+        // keeps the original one-line wording; a batch lists all of them. Custom
+        // templates may reference %name%/%email% or %requests% directly.
         $defaultBody = EmailDefaults::get('email_admin_body');
-        if ($hasPii) {
+        if (count($requesters) === 1) {
             $defaultBody .= __("\n\nAnfrage von: %name% <%email%>", 'wp-porto-sender');
+        } elseif (count($requesters) > 1) {
+            $defaultBody .= __("\n\nAnfragen:\n%requests%", 'wp-porto-sender');
         }
 
         [$subject, $body] = $this->compose('email_admin_subject', 'email_admin_body', $vars, $defaultBody);
         return (bool) wp_mail($to, $subject, $body);
+    }
+
+    /**
+     * Normalise the claimant list from either the new `requesters` list or the legacy
+     * single `name`/`email` pair (kept for callers/tests that predate batching). Legacy
+     * entries require BOTH name and email (the original PII gate); list entries keep any
+     * non-empty side. Returns a re-indexed list.
+     *
+     * @param array<string,mixed> $data
+     * @return list<array{name:string,email:string}>
+     */
+    private function normalizeRequesters(array $data): array
+    {
+        $out = [];
+        if (isset($data['requesters']) && is_array($data['requesters'])) {
+            foreach ($data['requesters'] as $r) {
+                if (!is_array($r)) { continue; }
+                $name = trim((string) ($r['name'] ?? ''));
+                $email = trim((string) ($r['email'] ?? ''));
+                if ($name !== '' || $email !== '') {
+                    $out[] = ['name' => $name, 'email' => $email];
+                }
+            }
+            return $out;
+        }
+        $name = trim((string) ($data['name'] ?? ''));
+        $email = trim((string) ($data['email'] ?? ''));
+        if ($name !== '' && $email !== '') {
+            $out[] = ['name' => $name, 'email' => $email];
+        }
+        return $out;
+    }
+
+    /** "Name <email>", degrading to whichever side is present. */
+    private function formatRequester(array $r): string
+    {
+        $name = (string) ($r['name'] ?? '');
+        $email = (string) ($r['email'] ?? '');
+        if ($name !== '' && $email !== '') {
+            return $name . ' <' . $email . '>';
+        }
+        return $email !== '' ? $email : $name;
     }
 
     /**
