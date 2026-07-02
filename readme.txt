@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.7.0 =
+* New: the admin notification for a claimed porto now shows the retrieval time for each requester, and includes the requester's name and e-mail by default. You can still turn the name/e-mail off under Porto-Sender → Missbrauchsschutz (note it places personal data in the notification e-mail).
+* Fix: on quiet sites, admin notifications after the first one within a collection window were silently dropped by the daily cleanup instead of being sent — so only the first claim of a burst was ever reported. Accumulated claims are now delivered as one collected e-mail rather than discarded.
 
 = 0.6.0 =
 * New: a "Beispiel-CSV herunterladen" button under Codes hinzufügen provides a ready-made example file for the CSV code import, so the expected format (columns product, code and the optional purchase_date) is clear at a glance. The example is built from your configured products, so it never contains an invalid product key.
