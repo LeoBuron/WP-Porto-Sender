@@ -44,7 +44,7 @@ final class ConfirmHandler
      */
     public function resultUrl(string $status): string
     {
-        $pageId = PageRenderer::resolvePageId($this->settings->pageResult());
+        $pageId = PageRenderer::effectivePageId('result', $this->settings);
         if ($pageId > 0) {
             return add_query_arg('porto_status', $status, get_permalink($pageId));
         }

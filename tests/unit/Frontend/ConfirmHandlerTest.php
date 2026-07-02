@@ -15,6 +15,7 @@ final class ConfirmHandlerTest extends WpUnitTestCase
         Functions\when('home_url')->alias(fn($p = '') => 'https://x.test' . $p);
         Functions\when('get_permalink')->alias(fn($id) => 'https://x.test/seite-' . $id);
         Functions\when('get_post_status')->justReturn(false); // no override page by default
+        Functions\when('get_option')->justReturn([]);          // no auto-provisioned pages by default
         Functions\when('add_query_arg')->alias(function ($key, $value = null, $url = null) {
             if (is_array($key)) { $url = $value; $q = http_build_query($key); }
             else { $q = rawurlencode((string) $key) . '=' . rawurlencode((string) $value); }
@@ -52,5 +53,15 @@ final class ConfirmHandlerTest extends WpUnitTestCase
         $this->assertStringContainsString('porto_view=result', $url);
         $this->assertStringContainsString('porto_status=expired', $url);
         $this->assertStringNotContainsString('seite-12', $url);
+    }
+
+    public function test_result_url_uses_auto_provisioned_page_when_no_override(): void
+    {
+        Functions\when('get_post_status')->justReturn('publish');            // the auto page is published
+        Functions\when('get_option')->justReturn(['sent' => 21, 'result' => 22]);
+        $url = $this->handler(['page_result' => 0])->resultUrl('issued');
+        $this->assertStringContainsString('seite-22', $url);
+        $this->assertStringContainsString('porto_status=issued', $url);
+        $this->assertStringNotContainsString('porto_view=result', $url);
     }
 }

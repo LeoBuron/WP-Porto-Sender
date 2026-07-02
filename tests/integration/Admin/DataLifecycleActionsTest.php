@@ -8,6 +8,7 @@ use PortoSender\Requests\RequestRepository;
 use PortoSender\Persistence\Schema;
 use PortoSender\Persistence\SchemaVersion;
 use PortoSender\Settings\Settings;
+use PortoSender\Frontend\PageProvisioner;
 use PortoSender\Cron\Maintenance;
 
 final class DataLifecycleActionsTest extends PortoTestCase
@@ -72,5 +73,20 @@ final class DataLifecycleActionsTest extends PortoTestCase
 
         // Without rescheduling, the DSGVO anonymization / pending-cleanup cron silently stops.
         $this->assertNotFalse(wp_next_scheduled(Maintenance::HOOK), 'daily maintenance cron must be re-armed after a clean-slate wipe');
+    }
+
+    public function test_delete_all_data_reprovisions_the_confirmation_pages(): void
+    {
+        global $wpdb;
+        remove_filter('query', [$this, '_drop_temporary_tables']);
+        // A clean-slate reset is NOT an uninstall: purgeAll deletes the auto pages, but the
+        // flow must keep working, so deleteAllData re-creates them (mirrors the cron re-arm).
+        (new ToolsPage(new CodeRepository($wpdb), new RequestRepository($wpdb)))->deleteAllData();
+
+        $ids = PageProvisioner::ids();
+        $this->assertGreaterThan(0, $ids['sent']);
+        $this->assertGreaterThan(0, $ids['result']);
+        $this->assertSame('publish', get_post_status($ids['sent']));
+        $this->assertSame('publish', get_post_status($ids['result']));
     }
 }

@@ -21,6 +21,7 @@ final class RequestFormTest extends WpUnitTestCase
         Functions\when('home_url')->alias(fn($p = '') => 'https://x.test' . $p);
         Functions\when('get_permalink')->alias(fn($id) => 'https://x.test/seite-' . $id);
         Functions\when('get_post_status')->justReturn(false); // no override page by default
+        Functions\when('get_option')->justReturn([]);          // no auto-provisioned pages by default
         Functions\when('add_query_arg')->alias(function ($key, $value = null, $url = null) {
             if (is_array($key)) { $url = $value; $q = http_build_query($key); }
             else { $q = rawurlencode((string) $key) . '=' . rawurlencode((string) $value); }
@@ -123,5 +124,15 @@ final class RequestFormTest extends WpUnitTestCase
         $html = $form->render([]);
 
         $this->assertStringContainsString('data-sent-url="https://x.test/seite-9?porto_view=sent"', $html);
+    }
+
+    public function test_sent_url_uses_auto_provisioned_page_when_no_override(): void
+    {
+        Functions\when('get_post_status')->justReturn('publish');            // the auto page is published
+        Functions\when('get_option')->justReturn(['sent' => 21, 'result' => 22]);
+        $form = new RequestForm(ProductCatalog::default(), new Settings([])); // page_sent defaults to 0
+        $html = $form->render([]);
+
+        $this->assertStringContainsString('data-sent-url="https://x.test/seite-21?porto_view=sent"', $html);
     }
 }

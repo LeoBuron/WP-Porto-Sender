@@ -82,7 +82,7 @@ final class RequestForm
      */
     private function sentUrl(): string
     {
-        $pageId = PageRenderer::resolvePageId($this->settings->pageSent());
+        $pageId = PageRenderer::effectivePageId('sent', $this->settings);
         $base = $pageId > 0 ? get_permalink($pageId) : home_url('/');
         return add_query_arg('porto_view', 'sent', $base);
     }
