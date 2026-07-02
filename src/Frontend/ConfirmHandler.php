@@ -8,18 +8,12 @@ use PortoSender\Settings\Settings;
 final class ConfirmHandler
 {
     /**
-     * Canonical status → visitor message map. Also the allow-list of valid
-     * `porto_status` values (PageRenderer consumes this table for the themed
-     * result view and the override-page injection).
+     * Allow-list of valid `porto_status` values (PageRenderer consumes it for the
+     * themed result view and the override-page injection). The visitor-facing text
+     * per status lives in Settings::TEXT_DEFAULTS ('text_status_*') and is editable
+     * on the Seiten settings tab.
      */
-    public const MESSAGES = [
-        'issued' => 'Dein Porto-Code wurde dir per E-Mail zugeschickt.',
-        'already_issued' => 'Du hast deinen Porto-Code bereits erhalten.',
-        'expired' => 'Dieser Bestätigungslink ist abgelaufen. Bitte stelle eine neue Anfrage.',
-        'out_of_stock' => 'Aktuell sind keine Codes verfügbar. Bitte versuche es später erneut.',
-        'email_failed' => 'Der Versand ist fehlgeschlagen. Bitte versuche es später erneut.',
-        'invalid_token' => 'Dieser Bestätigungslink ist ungültig.',
-    ];
+    public const STATUSES = ['issued', 'already_issued', 'expired', 'out_of_stock', 'email_failed', 'invalid_token'];
 
     public function __construct(private IssuanceService $issuance, private Settings $settings) {}
 

@@ -15,13 +15,7 @@ final class Mailer implements MailerInterface
             '%name%' => $name,
             '%confirm_url%' => $confirmUrl,
         ];
-        [$subject, $body] = $this->compose(
-            'email_confirm_subject',
-            __('Bitte bestätige deine Porto-Anfrage', 'wp-porto-sender'),
-            'email_confirm_body',
-            __("Hallo %name%,\n\nbitte bestätige deine Anfrage über diesen Link:\n%confirm_url%\n\nWenn du das nicht warst, ignoriere diese E-Mail.", 'wp-porto-sender'),
-            $vars
-        );
+        [$subject, $body] = $this->compose('email_confirm_subject', 'email_confirm_body', $vars);
         return (bool) wp_mail($email, $subject, $body);
     }
 
@@ -34,13 +28,7 @@ final class Mailer implements MailerInterface
             '%code%' => $code,
             '%owner_address%' => $this->settings->ownerAddress(),
         ];
-        [$subject, $body] = $this->compose(
-            'email_delivery_subject',
-            __('Dein Porto-Code', 'wp-porto-sender'),
-            'email_delivery_body',
-            __("Hallo %name%,\n\nhier ist dein Porto-Code für einen %product% (%limits%):\n\n    #PORTO %code%\n\nSchreibe diesen Code oben rechts auf den Umschlag (in das Frankierfeld) und sende den Brief an:\n\n%owner_address%\n\nGültig bis Ende des dritten Jahres nach dem Kauf.", 'wp-porto-sender'),
-            $vars
-        );
+        [$subject, $body] = $this->compose('email_delivery_subject', 'email_delivery_body', $vars);
         return (bool) wp_mail($email, $subject, $body);
     }
 
@@ -50,26 +38,14 @@ final class Mailer implements MailerInterface
             '%product%' => $productLabel,
             '%remaining%' => (string) $remaining,
         ];
-        [$subject, $body] = $this->compose(
-            'email_lowstock_subject',
-            __('WP-Porto-Sender: Vorrat wird knapp', 'wp-porto-sender'),
-            'email_lowstock_body',
-            __('Nur noch %remaining% Codes für "%product%" verfügbar. Bitte nachfüllen.', 'wp-porto-sender'),
-            $vars
-        );
+        [$subject, $body] = $this->compose('email_lowstock_subject', 'email_lowstock_body', $vars);
         return (bool) wp_mail($to, $subject, $body);
     }
 
     public function sendOutOfStock(string $to, string $productLabel): bool
     {
         $vars = ['%product%' => $productLabel];
-        [$subject, $body] = $this->compose(
-            'email_outofstock_subject',
-            __('WP-Porto-Sender: Vorrat erschöpft', 'wp-porto-sender'),
-            'email_outofstock_body',
-            __('Es sind keine Codes für "%product%" mehr verfügbar.', 'wp-porto-sender'),
-            $vars
-        );
+        [$subject, $body] = $this->compose('email_outofstock_subject', 'email_outofstock_body', $vars);
         return (bool) wp_mail($to, $subject, $body);
     }
 
@@ -98,36 +74,31 @@ final class Mailer implements MailerInterface
         // The default body only carries the "Anfrage von" line when PII is present, so
         // the PII-free default never renders an empty "Anfrage von:  <>". A custom
         // template may reference %name%/%email% directly (they resolve to '' when off).
-        $defaultBody = __("Es wurden Porto-Codes abgerufen.\n\nProdukt: %product%\nAnzahl seit der letzten Benachrichtigung: %count%\nVerbleibender Vorrat: %remaining%", 'wp-porto-sender');
+        $defaultBody = EmailDefaults::get('email_admin_body');
         if ($hasPii) {
             $defaultBody .= __("\n\nAnfrage von: %name% <%email%>", 'wp-porto-sender');
         }
 
-        [$subject, $body] = $this->compose(
-            'email_admin_subject',
-            __('WP-Porto-Sender: Porto abgerufen', 'wp-porto-sender'),
-            'email_admin_body',
-            $defaultBody,
-            $vars
-        );
+        [$subject, $body] = $this->compose('email_admin_subject', 'email_admin_body', $vars, $defaultBody);
         return (bool) wp_mail($to, $subject, $body);
     }
 
     /**
      * Resolve a message's subject and body: use the admin-configured template when the
-     * stored value is non-empty, otherwise the built-in default, then substitute the
-     * %placeholder% tokens.
+     * stored value is non-empty, otherwise the built-in default (EmailDefaults), then
+     * substitute the %placeholder% tokens. $defaultBodyOverride lets the admin
+     * notification swap in its dynamically extended (PII-carrying) default body.
      *
      * @param array<string,string> $vars
      * @return array{0:string,1:string} [subject, body]
      */
-    private function compose(string $subjectKey, string $defaultSubject, string $bodyKey, string $defaultBody, array $vars): array
+    private function compose(string $subjectKey, string $bodyKey, array $vars, ?string $defaultBodyOverride = null): array
     {
         $subjectTpl = $this->settings->emailTemplate($subjectKey);
         $bodyTpl = $this->settings->emailTemplate($bodyKey);
         return [
-            $this->render($subjectTpl !== '' ? $subjectTpl : $defaultSubject, $vars),
-            $this->render($bodyTpl !== '' ? $bodyTpl : $defaultBody, $vars),
+            $this->render($subjectTpl !== '' ? $subjectTpl : EmailDefaults::get($subjectKey), $vars),
+            $this->render($bodyTpl !== '' ? $bodyTpl : ($defaultBodyOverride ?? EmailDefaults::get($bodyKey)), $vars),
         ];
     }
 

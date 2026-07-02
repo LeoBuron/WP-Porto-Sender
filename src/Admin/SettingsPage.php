@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace PortoSender\Admin;
 
+use PortoSender\Mail\EmailDefaults;
 use PortoSender\Settings\Settings;
 use PortoSender\Postage\ProductCatalog;
 
@@ -208,11 +209,40 @@ final class SettingsPage
 
     private function renderPages(Settings $s, string $opt): void
     {
-        echo '<p class="description">' . esc_html__('Wähle optional eigene Seiten für die Rückmeldungen. „Plugin-Standard" zeigt eine themenintegrierte Standardseite.', 'wp-porto-sender') . '</p>';
+        echo '<p class="description">' . esc_html__('Wähle optional eigene Seiten für die Rückmeldungen. „Plugin-Standard" zeigt eine themenintegrierte Standardseite mit dem unten anpassbaren Text.', 'wp-porto-sender') . '</p>';
         $this->renderPageDropdown($opt, 'page_sent', $s->pageSent(),
             __('Seite „Bitte E-Mail bestätigen" (nach dem Absenden)', 'wp-porto-sender'));
         $this->renderPageDropdown($opt, 'page_result', $s->pageResult(),
             __('Ergebnisseite (nach Klick auf den Bestätigungslink)', 'wp-porto-sender'));
+
+        // Texts of the built-in pages, prefilled with their defaults. On a custom page
+        // the same text is injected as the notice above the page content.
+        echo '<fieldset><legend>' . esc_html__('Text der Seite „Bitte E-Mail bestätigen"', 'wp-porto-sender') . '</legend>';
+        echo '<p class="description">' . esc_html__('Wird nach dem Absenden des Formulars angezeigt – auf der Standardseite bzw. als Hinweis über einer eigenen Seite. Feld leeren und speichern setzt auf den Standardtext zurück.', 'wp-porto-sender') . '</p>';
+        $this->renderPageTextField($s, $opt, 'text_page_sent', __('Hinweistext', 'wp-porto-sender'));
+        echo '</fieldset>';
+
+        echo '<fieldset><legend>' . esc_html__('Texte der Ergebnisseite', 'wp-porto-sender') . '</legend>';
+        echo '<p class="description">' . esc_html__('Je nach Ausgang der Bestätigung wird einer dieser Texte angezeigt. Feld leeren und speichern setzt auf den Standardtext zurück.', 'wp-porto-sender') . '</p>';
+        $statusFields = [
+            'text_status_issued' => __('Erfolg – Code wurde verschickt', 'wp-porto-sender'),
+            'text_status_already_issued' => __('Code wurde bereits abgerufen', 'wp-porto-sender'),
+            'text_status_expired' => __('Bestätigungslink abgelaufen', 'wp-porto-sender'),
+            'text_status_out_of_stock' => __('Kein Vorrat verfügbar', 'wp-porto-sender'),
+            'text_status_email_failed' => __('E-Mail-Versand fehlgeschlagen', 'wp-porto-sender'),
+            'text_status_invalid_token' => __('Bestätigungslink ungültig', 'wp-porto-sender'),
+        ];
+        foreach ($statusFields as $key => $label) {
+            $this->renderPageTextField($s, $opt, $key, $label);
+        }
+        echo '</fieldset>';
+    }
+
+    /** A single prefilled page-text input (value falls back to the built-in default). */
+    private function renderPageTextField(Settings $s, string $opt, string $key, string $label): void
+    {
+        printf('<p><label>%1$s<br><input type="text" class="large-text" name="%2$s[%3$s]" value="%4$s"></label></p>',
+            esc_html($label), esc_attr($opt), esc_attr($key), esc_attr($s->text($key)));
     }
 
     private function renderPageDropdown(string $opt, string $key, int $selected, string $label): void
@@ -231,7 +261,7 @@ final class SettingsPage
 
     private function renderEmails(Settings $s, string $opt): void
     {
-        echo '<p class="description">' . esc_html__('Betreff und Text der automatischen E-Mails. Leer lassen, um die eingebauten Standardtexte zu verwenden. Verfügbare Platzhalter stehen unter jedem Feld.', 'wp-porto-sender') . '</p>';
+        echo '<p class="description">' . esc_html__('Betreff und Text der automatischen E-Mails, vorbefüllt mit den Standardtexten – einfach direkt hier anpassen. Ein geleertes Feld wird beim Speichern auf den Standardtext zurückgesetzt. Verfügbare Platzhalter stehen unter jedem Feld.', 'wp-porto-sender') . '</p>';
         $messages = [
             'confirm'    => [__('Bestätigung (Double-Opt-In)', 'wp-porto-sender'), ['%name%', '%confirm_url%']],
             'delivery'   => [__('Zustellung (der Code)', 'wp-porto-sender'), ['%name%', '%product%', '%limits%', '%code%', '%owner_address%']],
@@ -242,21 +272,31 @@ final class SettingsPage
         foreach ($messages as $key => [$label, $placeholders]) {
             $subjectKey = 'email_' . $key . '_subject';
             $bodyKey = 'email_' . $key . '_body';
+            $subject = $this->emailValue($s, $subjectKey);
+            $body = $this->emailValue($s, $bodyKey);
             echo '<fieldset><legend>' . esc_html($label) . '</legend>';
             printf('<p><label>%1$s<br><input type="text" class="large-text" name="%2$s[%3$s]" value="%4$s"></label></p>',
-                esc_html__('Betreff', 'wp-porto-sender'), esc_attr($opt), esc_attr($subjectKey), esc_attr($s->emailTemplate($subjectKey)));
-            printf('<p><label>%1$s<br><textarea class="large-text" name="%2$s[%3$s]" rows="5">%4$s</textarea></label></p>',
-                esc_html__('Text', 'wp-porto-sender'), esc_attr($opt), esc_attr($bodyKey), esc_textarea($s->emailTemplate($bodyKey)));
+                esc_html__('Betreff', 'wp-porto-sender'), esc_attr($opt), esc_attr($subjectKey), esc_attr($subject));
+            printf('<p><label>%1$s<br><textarea class="large-text" name="%2$s[%3$s]" rows="%4$d">%5$s</textarea></label></p>',
+                esc_html__('Text', 'wp-porto-sender'), esc_attr($opt), esc_attr($bodyKey),
+                min(14, max(5, substr_count($body, "\n") + 2)), esc_textarea($body));
             $codes = implode(' ', array_map(
                 static fn (string $p): string => '<code>' . esc_html($p) . '</code>',
                 $placeholders
             ));
             printf('<p class="description">%s %s</p>', esc_html__('Platzhalter:', 'wp-porto-sender'), $codes);
             if ($key === 'admin') {
-                printf('<p class="description">%s</p>', esc_html__('%name% und %email% werden nur eingesetzt, wenn im Tab „Missbrauchsschutz" die Option „Name und E-Mail mitsenden" aktiviert ist – sonst bleiben sie leer.', 'wp-porto-sender'));
+                printf('<p class="description">%s</p>', esc_html__('%name% und %email% werden nur eingesetzt, wenn im Tab „Missbrauchsschutz" die Option „Name und E-Mail mitsenden" aktiviert ist – sonst bleiben sie leer. Solange dieser Text unverändert bleibt, hängt das Plugin bei aktivierter Option automatisch eine Zeile mit Name und E-Mail des Anfragenden an.', 'wp-porto-sender'));
             }
             echo '</fieldset>';
         }
+    }
+
+    /** The effective template text for the E-Mails tab: stored value, else built-in default. */
+    private function emailValue(Settings $s, string $key): string
+    {
+        $v = $s->emailTemplate($key);
+        return $v !== '' ? $v : EmailDefaults::get($key);
     }
 
     private function renderAbuse(Settings $s, string $opt): void
