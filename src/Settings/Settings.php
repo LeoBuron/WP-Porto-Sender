@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace PortoSender\Settings;
 
+use PortoSender\Mail\EmailDefaults;
+
 final class Settings
 {
     public const OPTION = 'porto_sender_settings';
@@ -17,6 +19,15 @@ final class Settings
         'text_legend_products' => 'Was möchtest du senden?',
         'text_consent' => 'Ich bin einverstanden, dass mein Name und meine E-Mail zur Zusendung des Codes verarbeitet werden.',
         'text_button' => 'Porto-Code anfordern',
+        // Built-in "sent"/"result" page texts (Seiten tab). PageRenderer shows them on
+        // the plugin's themed views and injects them as the notice on override pages.
+        'text_page_sent' => 'Bitte bestätige die Anfrage über den Link in deiner E-Mail.',
+        'text_status_issued' => 'Dein Porto-Code wurde dir per E-Mail zugeschickt.',
+        'text_status_already_issued' => 'Du hast deinen Porto-Code bereits erhalten.',
+        'text_status_expired' => 'Dieser Bestätigungslink ist abgelaufen. Bitte stelle eine neue Anfrage.',
+        'text_status_out_of_stock' => 'Aktuell sind keine Codes verfügbar. Bitte versuche es später erneut.',
+        'text_status_email_failed' => 'Der Versand ist fehlgeschlagen. Bitte versuche es später erneut.',
+        'text_status_invalid_token' => 'Dieser Bestätigungslink ist ungültig.',
     ];
 
     /** E-mail template keys (subject + body per message); default '' = use Mailer's built-in copy. */
@@ -208,22 +219,43 @@ final class Settings
         $result['form_max_width_px'] = absint($input['form_max_width_px'] ?? $result['form_max_width_px']);
         $result['form_field_gap_px'] = absint($input['form_field_gap_px'] ?? $result['form_field_gap_px']);
 
-        // Editable UI text (Item 1b).
-        $result['text_intro'] = sanitize_textarea_field($input['text_intro'] ?? $result['text_intro']);
-        $result['text_consent'] = sanitize_textarea_field($input['text_consent'] ?? $result['text_consent']);
-        foreach (['text_label_name', 'text_label_email', 'text_legend_products', 'text_button'] as $tk) {
-            $result[$tk] = sanitize_text_field($input[$tk] ?? $result[$tk]);
+        // Editable UI text (Item 1b) + page texts. Like the e-mail templates below, a
+        // submitted value equal to its built-in default is stored as '' so text() keeps
+        // following the plugin default (future default/translation improvements still
+        // reach the install instead of freezing the prefilled copy on first save). The
+        // two multi-line fields are CRLF-normalised; text_intro's default is '' so an
+        // empty intro simply stays ''.
+        $multiline = ['text_intro', 'text_consent'];
+        foreach (array_keys(self::TEXT_DEFAULTS) as $tk) {
+            $isMultiline = in_array($tk, $multiline, true);
+            $clean = $isMultiline
+                ? str_replace(["\r\n", "\r"], "\n", sanitize_textarea_field($input[$tk] ?? $result[$tk]))
+                : sanitize_text_field($input[$tk] ?? $result[$tk]);
+            $default = $isMultiline
+                ? sanitize_textarea_field(self::TEXT_DEFAULTS[$tk])
+                : sanitize_text_field(self::TEXT_DEFAULTS[$tk]);
+            $result[$tk] = ($clean === $default) ? '' : $clean;
         }
 
         // Pages (Item 2).
         $result['page_sent'] = absint($input['page_sent'] ?? $result['page_sent']);
         $result['page_result'] = absint($input['page_result'] ?? $result['page_result']);
 
-        // E-mail templates (Item 6): subjects single-line, bodies multi-line.
+        // E-mail templates (Item 6): subjects single-line, bodies multi-line. The form
+        // prefills empty fields with the built-in defaults, so a submitted value that
+        // still equals its default is stored as '' again — the install keeps following
+        // the plugin default (incl. the admin mail's dynamic "Anfrage von" PII line).
+        // Line endings are normalised because textareas post CRLF while the built-in
+        // defaults use LF.
         foreach (self::EMAIL_KEYS as $ek) {
-            $result[$ek] = str_ends_with($ek, '_subject')
+            $isSubject = str_ends_with($ek, '_subject');
+            $clean = $isSubject
                 ? sanitize_text_field($input[$ek] ?? $result[$ek])
-                : sanitize_textarea_field($input[$ek] ?? $result[$ek]);
+                : str_replace(["\r\n", "\r"], "\n", sanitize_textarea_field($input[$ek] ?? $result[$ek]));
+            $default = $isSubject
+                ? sanitize_text_field(EmailDefaults::get($ek))
+                : sanitize_textarea_field(EmailDefaults::get($ek));
+            $result[$ek] = ($clean === $default) ? '' : $clean;
         }
 
         return $result;

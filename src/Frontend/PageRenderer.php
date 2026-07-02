@@ -15,9 +15,6 @@ use PortoSender\Settings\Settings;
  */
 final class PageRenderer
 {
-    /** The "check your e-mail" notice shown after a successful submit. */
-    private const SENT_MESSAGE = 'Bitte bestätige die Anfrage über den Link in deiner E-Mail.';
-
     public function __construct(private Settings $settings) {}
 
     public function register(): void
@@ -26,10 +23,17 @@ final class PageRenderer
         add_filter('the_content', [$this, 'maybeInjectIntoPage']);
     }
 
-    /** Map an issuance status to its visitor message; unknown → invalid_token (allow-list). */
+    /** Map an issuance status to its (settings-editable) visitor message; unknown → invalid_token (allow-list). */
     public function message(string $status): string
     {
-        return ConfirmHandler::MESSAGES[$status] ?? ConfirmHandler::MESSAGES['invalid_token'];
+        $key = in_array($status, ConfirmHandler::STATUSES, true) ? $status : 'invalid_token';
+        return $this->settings->text('text_status_' . $key);
+    }
+
+    /** The (settings-editable) "check your e-mail" notice shown after a successful submit. */
+    private function sentMessage(): string
+    {
+        return $this->settings->text('text_page_sent');
     }
 
     /**
@@ -44,7 +48,7 @@ final class PageRenderer
 
         if ($view === 'sent') {
             if (self::resolvePageId($this->settings->pageSent()) > 0) { return; }
-            $this->renderThemed(self::SENT_MESSAGE);
+            $this->renderThemed($this->sentMessage());
         }
 
         if ($view === 'result') {
@@ -68,7 +72,7 @@ final class PageRenderer
         if ($sentPage > 0 && $current === $sentPage
             && isset($_GET['porto_view'])
             && sanitize_key((string) wp_unslash($_GET['porto_view'])) === 'sent') {
-            return $this->notice(self::SENT_MESSAGE) . $content;
+            return $this->notice($this->sentMessage()) . $content;
         }
 
         $resultPage = self::resolvePageId($this->settings->pageResult());
@@ -96,7 +100,11 @@ final class PageRenderer
 
     private function notice(string $message): string
     {
-        return '<div class="porto-notice" role="status"><p>' . esc_html($message) . '</p></div>';
+        // Strip shortcodes from the (admin-editable) notice text so it renders identically
+        // on both paths: the injected-into-a-page branch feeds the_content, where a later
+        // do_shortcode (priority 11) would otherwise expand a token like [gallery]; the
+        // themed view echoes directly and never would. esc_html keeps all output inert.
+        return '<div class="porto-notice" role="status"><p>' . esc_html(strip_shortcodes($message)) . '</p></div>';
     }
 
     private function renderThemed(string $message): void

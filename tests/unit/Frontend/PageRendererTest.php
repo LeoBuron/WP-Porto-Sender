@@ -12,6 +12,7 @@ final class PageRendererTest extends WpUnitTestCase
     {
         parent::setUp();
         Functions\when('esc_html')->returnArg(1);
+        Functions\when('strip_shortcodes')->returnArg(1);
         Functions\when('wp_unslash')->returnArg(1);
         Functions\when('sanitize_key')->alias(
             fn ($v) => strtolower(preg_replace('/[^a-z0-9_\-]/i', '', (string) $v))
@@ -38,6 +39,28 @@ final class PageRendererTest extends WpUnitTestCase
         $this->assertStringContainsString('keine Codes', $r->message('out_of_stock'));
         $this->assertStringContainsString('fehlgeschlagen', $r->message('email_failed'));
         $this->assertStringContainsString('ungültig', $r->message('invalid_token'));
+    }
+
+    public function test_status_message_is_settings_editable(): void
+    {
+        $r = $this->renderer(['text_status_issued' => 'Juhu, dein Code ist unterwegs!']);
+        $this->assertSame('Juhu, dein Code ist unterwegs!', $r->message('issued'));
+        // Other statuses keep their defaults.
+        $this->assertSame('Du hast deinen Porto-Code bereits erhalten.', $r->message('already_issued'));
+    }
+
+    public function test_custom_sent_text_is_injected_into_override_page(): void
+    {
+        Functions\when('is_singular')->justReturn(true);
+        Functions\when('in_the_loop')->justReturn(true);
+        Functions\when('is_main_query')->justReturn(true);
+        Functions\when('get_queried_object_id')->justReturn(7);
+        Functions\when('get_post_status')->justReturn('publish');
+        $_GET['porto_view'] = 'sent';
+
+        $out = $this->renderer(['page_sent' => 7, 'text_page_sent' => 'Schau in dein Postfach!'])
+            ->maybeInjectIntoPage('<p>Body</p>');
+        $this->assertStringContainsString('Schau in dein Postfach!', $out);
     }
 
     public function test_unknown_status_falls_back_to_invalid_token_message(): void

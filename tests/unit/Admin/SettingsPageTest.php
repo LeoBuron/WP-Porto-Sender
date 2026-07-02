@@ -82,6 +82,50 @@ final class SettingsPageTest extends WpUnitTestCase
         $this->assertStringContainsString('<code>%confirm_url%</code>', $html);
     }
 
+    public function test_email_fields_are_prefilled_with_builtin_defaults(): void
+    {
+        $this->stubRender();
+
+        ob_start();
+        (new SettingsPage())->render();
+        $html = (string) ob_get_clean();
+
+        // Nothing stored (get_option => []) → the boxes show the built-in copy
+        // instead of rendering empty (esc_attr/esc_textarea are identity stubs).
+        $this->assertStringContainsString('value="Bitte bestätige deine Porto-Anfrage"', $html);
+        $this->assertStringContainsString('#PORTO %code%', $html);
+    }
+
+    public function test_email_fields_show_stored_custom_template(): void
+    {
+        $this->stubRender();
+        Functions\when('get_option')->justReturn(['email_confirm_subject' => 'Mein eigener Betreff']);
+
+        ob_start();
+        (new SettingsPage())->render();
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('value="Mein eigener Betreff"', $html);
+        $this->assertStringNotContainsString('value="Bitte bestätige deine Porto-Anfrage"', $html);
+    }
+
+    public function test_pages_panel_renders_editable_default_page_texts(): void
+    {
+        $this->stubRender();
+
+        ob_start();
+        (new SettingsPage())->render();
+        $html = (string) ob_get_clean();
+
+        // The sent notice + all six result-status texts are editable and prefilled.
+        $this->assertStringContainsString('porto_sender_settings[text_page_sent]', $html);
+        $this->assertStringContainsString('value="Bitte bestätige die Anfrage über den Link in deiner E-Mail."', $html);
+        foreach (['issued', 'already_issued', 'expired', 'out_of_stock', 'email_failed', 'invalid_token'] as $status) {
+            $this->assertStringContainsString('porto_sender_settings[text_status_' . $status . ']', $html);
+        }
+        $this->assertStringContainsString('value="Dein Porto-Code wurde dir per E-Mail zugeschickt."', $html);
+    }
+
     public function test_enqueues_color_picker_only_on_settings_page(): void
     {
         Functions\when('add_menu_page')->justReturn('toplevel_page_porto-sender');
