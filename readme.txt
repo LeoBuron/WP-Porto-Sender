@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.5.3
+Stable tag: 0.5.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.5.4 =
+* Fix: the built-in "Bitte E-Mail bestätigen" and result pages could show the theme's header but no content or footer on sites running caching/optimisation plugins, because those pages were assembled as a stand-alone document unlike every other page. They now render through real WordPress pages that the plugin creates automatically, using the same theme pipeline as the rest of the site. Choosing your own pages under Porto-Sender → Seiten still overrides them; the built-in stand-alone document remains only as a last-resort fallback.
+* Existing in-flight links to the old built-in views are redirected onto the real pages. The auto-created pages are kept out of search, menus and the sitemap, are hidden (set to draft) while the plugin is deactivated, and are removed on uninstall / "Alle Daten löschen".
 
 = 0.5.3 =
 * Fix: the built-in "Bitte E-Mail bestätigen" and result pages showed the theme's header and footer but no message on sites where a plugin disables the block editor. The message now renders directly, independently of block rendering.
