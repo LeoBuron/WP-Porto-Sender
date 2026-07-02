@@ -98,6 +98,23 @@
   background: rgba(0, 0, 0, 0.04);
 }
 
+/* Validation error styling: a red status message and a red outline on the
+   offending field(s), set by porto-form.js when a field fails validation. */
+.porto-request-form .porto-message--error:not(:empty) {
+  border-left-color: #d63638;
+  background: rgba(214, 54, 56, 0.06);
+}
+
+.porto-request-form .porto-invalid {
+  outline: 2px solid #d63638;
+  outline-offset: 1px;
+}
+
+.porto-request-form input.porto-invalid,
+.porto-request-form fieldset.porto-invalid {
+  border-color: #d63638;
+}
+
 /* Layout: Stacked (default) — comfortable vertical rhythm using --porto-gap as-is. */
 
 /* Layout: Compact — tighter spacing for dense pages/sidebars. */

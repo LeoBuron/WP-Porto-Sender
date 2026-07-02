@@ -73,6 +73,21 @@ final class IssuanceSubmitTest extends MockeryTestCase
         $this->assertSame('invalid', $svc->submit($this->input(['email' => 'nope']))['status']);
     }
 
+    public function test_invalid_reports_the_offending_fields(): void
+    {
+        [$svc] = $this->service();
+
+        // A single bad field is named, so the client can mark exactly it.
+        $this->assertSame(['email'], $svc->submit($this->input(['email' => 'foo@bar']))['fields']);
+        $this->assertSame(['name'], $svc->submit($this->input(['name' => '   ']))['fields']);
+        $this->assertSame(['product'], $svc->submit($this->input(['product' => 'nope']))['fields']);
+
+        // Several at once are reported together, in field order.
+        $r = $svc->submit($this->input(['name' => '', 'email' => 'x', 'product' => '']));
+        $this->assertSame('invalid', $r['status']);
+        $this->assertSame(['name', 'email', 'product'], $r['fields']);
+    }
+
     public function test_captcha_failure(): void
     {
         $captcha = Mockery::mock(CaptchaVerifier::class)->shouldReceive('verify')->andReturn(false)->getMock();

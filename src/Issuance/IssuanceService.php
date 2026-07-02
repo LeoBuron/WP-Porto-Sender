@@ -35,16 +35,22 @@ final class IssuanceService
         private ?GeoGate $geoGate = null,
     ) {}
 
-    /** @return array{status:string} */
+    /** @return array{status:string, fields?:array<int,string>} */
     public function submit(array $input): array
     {
         $name = trim((string) ($input['name'] ?? ''));
         $email = trim((string) ($input['email'] ?? ''));
         $product = (string) ($input['product'] ?? '');
 
+        // Attribute each failure to its field so the client can mark exactly the
+        // offending input instead of showing one opaque "fill everything in" line.
         $enabled = $this->settings->enabledProducts();
-        if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($product, $enabled, true)) {
-            return ['status' => 'invalid'];
+        $fields = [];
+        if ($name === '') { $fields[] = 'name'; }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $fields[] = 'email'; }
+        if (!in_array($product, $enabled, true)) { $fields[] = 'product'; }
+        if ($fields !== []) {
+            return ['status' => 'invalid', 'fields' => $fields];
         }
         if (!$this->captcha->verify((string) ($input['captcha'] ?? ''))) {
             return ['status' => 'captcha_failed'];

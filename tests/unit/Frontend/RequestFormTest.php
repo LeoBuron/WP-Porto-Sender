@@ -43,6 +43,8 @@ final class RequestFormTest extends WpUnitTestCase
         $this->assertStringContainsString('name="porto_product"', $html);
         $this->assertStringContainsString('datenschutz', $html); // privacy link
         $this->assertStringContainsString('type="checkbox"', $html); // consent
+        // JS owns all field validation, so native browser blocking is turned off.
+        $this->assertStringContainsString('novalidate', $html);
     }
 
     public function test_render_applies_layout_class_style_vars_and_custom_labels(): void

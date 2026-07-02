@@ -12,9 +12,11 @@ final class RequestForm
     public function enqueueAssets(): void
     {
         $base = plugins_url('assets/', dirname(__DIR__, 2) . '/porto-sender.php');
-        wp_enqueue_style('porto-form', $base . 'porto-form.css', [], '1.0.0');
+        // porto-form.css/js are bumped to 1.1.0 for the per-field validation feedback
+        // change, so cached browsers refetch the new assets. altcha.min.js is unchanged.
+        wp_enqueue_style('porto-form', $base . 'porto-form.css', [], '1.1.0');
         wp_enqueue_script('porto-altcha', $base . 'altcha.min.js', [], '1.0.0', true);
-        wp_enqueue_script('porto-form', $base . 'porto-form.js', ['porto-altcha'], '1.0.0', true);
+        wp_enqueue_script('porto-form', $base . 'porto-form.js', ['porto-altcha'], '1.1.0', true);
     }
 
     public function render(array $atts): string
@@ -50,7 +52,7 @@ final class RequestForm
 
         ob_start(); ?>
 <style>.porto-request-form{<?php echo $styleVars; ?>}</style>
-<form class="porto-request-form porto-layout-<?php echo esc_attr($layout); ?>" data-endpoint="<?php echo esc_attr($restUrl); ?>" data-sent-url="<?php echo esc_url($sentUrl); ?>" autocomplete="off">
+<form class="porto-request-form porto-layout-<?php echo esc_attr($layout); ?>" data-endpoint="<?php echo esc_attr($restUrl); ?>" data-sent-url="<?php echo esc_url($sentUrl); ?>" autocomplete="off" novalidate>
   <?php if ($intro !== ''): ?><p class="porto-intro"><?php echo esc_html($intro); ?></p><?php endif; ?>
   <p><label><?php echo esc_html($this->settings->text('text_label_name')); ?><br>
     <input type="text" name="porto_name" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label></p>
