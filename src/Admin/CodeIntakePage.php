@@ -5,6 +5,7 @@ namespace PortoSender\Admin;
 use PortoSender\Inventory\CodeStore;
 use PortoSender\Postage\ProductCatalog;
 use PortoSender\Portability\CodesCsvImporter;
+use PortoSender\Portability\CsvWriter;
 
 final class CodeIntakePage
 {
@@ -29,6 +30,30 @@ final class CodeIntakePage
         $purchase = \DateTimeImmutable::createFromFormat('Y-m-d', (string) ($post['purchase_date'] ?? ''))
             ?: new \DateTimeImmutable('now');
         return $this->codes->addBatch($product, $purchase, self::parseCodes((string) ($post['codes'] ?? '')));
+    }
+
+    /**
+     * Build a small, self-documenting example CSV for the code importer.
+     *
+     * One row per catalog product, using the real product keys (so the file can
+     * never reference an unknown `product`) and clearly-fake placeholder codes.
+     * Only the first row carries a `purchase_date`; the rest leave it blank,
+     * which demonstrates within the file itself that the column is optional —
+     * the importer treats an empty `purchase_date` as "today". Built via
+     * CsvWriter for RFC-4180 quoting + formula-injection safety, so it
+     * round-trips cleanly back through CsvReader/CodesCsvImporter.
+     *
+     * @param string $today `purchase_date` for the first row, format `Y-m-d`
+     */
+    public function exampleCsv(string $today): string
+    {
+        $rows = [];
+        $i = 0;
+        foreach ($this->catalog->all() as $product) {
+            $rows[] = [$product->key, sprintf('BEISPIEL-CODE-%04d', $i + 1), $i === 0 ? $today : ''];
+            $i++;
+        }
+        return CsvWriter::toString(['product', 'code', 'purchase_date'], $rows);
     }
 
     /**
@@ -57,6 +82,17 @@ final class CodeIntakePage
             if (!current_user_can('manage_options')) { wp_die('forbidden'); }
             $n = $this->handleSubmit(wp_unslash($_POST));
             wp_safe_redirect(add_query_arg('porto_added', $n, admin_url('admin.php?page=porto-sender-intake')));
+            exit;
+        });
+        add_action('admin_post_porto_intake_csv_example', function (): void {
+            check_admin_referer('porto_intake_csv_example');
+            if (!current_user_can('manage_options')) { wp_die('forbidden'); }
+            $csv = $this->exampleCsv((string) current_time('Y-m-d'));
+            nocache_headers();
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="porto-codes-beispiel.csv"');
+            header('Content-Length: ' . strlen($csv));
+            echo $csv; // raw CSV download, never rendered as HTML
             exit;
         });
         add_action('admin_post_porto_intake_csv', function (): void {
@@ -111,6 +147,13 @@ final class CodeIntakePage
 
         echo '<hr><h2>' . esc_html__('CSV-Import', 'wp-porto-sender') . '</h2>';
         echo '<p>' . esc_html__('Spalten: product,code[,purchase_date] — Kopfzeile erforderlich.', 'wp-porto-sender') . '</p>';
+        $exampleUrl = wp_nonce_url(
+            admin_url('admin-post.php?action=porto_intake_csv_example'),
+            'porto_intake_csv_example'
+        );
+        echo '<p><a class="button" href="' . esc_url($exampleUrl) . '">'
+            . esc_html__('Beispiel-CSV herunterladen', 'wp-porto-sender') . '</a> '
+            . esc_html__('Die Spalte purchase_date ist optional (leer = heute).', 'wp-porto-sender') . '</p>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" enctype="multipart/form-data">';
         wp_nonce_field('porto_intake_csv');
         echo '<input type="hidden" name="action" value="porto_intake_csv">';
