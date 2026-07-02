@@ -23,6 +23,7 @@ final class UninstallCompletenessTest extends PortoTestCase
         global $wpdb;
         update_option(Settings::OPTION, array_merge(Settings::defaults(), ['hash_salt' => 'X']));
         update_option(WpNotifyThrottleStore::PENDING_OPTION, 5); // missed by the OLD uninstall.php
+        update_option(WpNotifyThrottleStore::CONTEXT_OPTION, ['product_label' => 'X', 'remaining' => 1]);
         set_transient('porto_rl_ip_zzz_1', 1, 3600);
         // Auto-provisioned "sent"/"result" pages must be removed by uninstall too.
         (new PageProvisioner(Settings::fromOption()))->ensure();
@@ -39,6 +40,7 @@ final class UninstallCompletenessTest extends PortoTestCase
 
         $this->assertFalse(get_option(Settings::OPTION), 'settings gone');
         $this->assertFalse(get_option(WpNotifyThrottleStore::PENDING_OPTION), 'notify pending gone');
+        $this->assertFalse(get_option(WpNotifyThrottleStore::CONTEXT_OPTION), 'notify context gone');
         $this->assertFalse(get_transient('porto_rl_ip_zzz_1'), 'rate-limit transient gone');
         $this->assertFalse(wp_next_scheduled(Maintenance::HOOK), 'cron unscheduled');
         $this->assertNull(get_post($autoPages['sent']), 'auto sent page deleted');

@@ -37,7 +37,7 @@ final class MaintenanceTest extends PortoTestCase
         $this->assertNull($requests->findByTokenHash(str_repeat('c', 64)));
     }
 
-    public function test_run_purges_a_stale_pending_notification_batch(): void
+    public function test_run_flushes_a_stale_pending_notification_batch(): void
     {
         global $wpdb;
         $codes = new CodeRepository($wpdb);
@@ -47,16 +47,26 @@ final class MaintenanceTest extends PortoTestCase
         $clock->shouldReceive('now')->andReturn(new \DateTimeImmutable('2026-06-24 03:00:00'));
         $alerter = new StockAlerter($codes, $settings, new Mailer($settings), ProductCatalog::default(), $clock);
 
+        $mails = [];
+        add_filter('pre_wp_mail', function ($null, $atts) use (&$mails) { $mails[] = $atts; return true; }, 10, 2);
+
         // A batch accumulated claimant PII but was never flushed and its cooldown has elapsed.
         $store = new WpNotifyThrottleStore();
         $store->setPending(2);
-        $store->setPendingRequesters([['name' => 'Bob', 'email' => 'b@e.de'], ['name' => 'Cara', 'email' => 'c@e.de']]);
+        $store->setPendingRequesters([['name' => 'Bob', 'email' => 'b@e.de', 'time' => 0], ['name' => 'Cara', 'email' => 'c@e.de', 'time' => 0]]);
+        $store->setPendingContext(['product_label' => 'Großbrief', 'remaining' => 4]);
         delete_transient(WpNotifyThrottleStore::COOLDOWN_TRANSIENT); // not cooling
 
         $notifier = new AdminNotifier($settings, new Mailer($settings), $store);
         (new Maintenance($codes, $requests, $alerter, $settings, $clock, $notifier))->run();
 
-        $this->assertSame(0, $store->pending(), 'stale count dropped');
-        $this->assertSame([], $store->pendingRequesters(), 'stale claimant PII purged');
+        // Bug fix: the stranded batch is SENT (not discarded). Filter by body so a possible
+        // stock-alert mail to the same address doesn't confuse the assertion.
+        $flush = array_values(array_filter($mails, fn($m) => str_contains((string) ($m['message'] ?? ''), '- Bob <b@e.de>')));
+        $this->assertCount(1, $flush, 'stranded batch flushed as one mail');
+        $this->assertStringContainsString('- Cara <c@e.de>', (string) $flush[0]['message']);
+
+        $this->assertSame(0, $store->pending(), 'count cleared after flush');
+        $this->assertSame([], $store->pendingRequesters(), 'claimant PII cleared after flush');
     }
 }

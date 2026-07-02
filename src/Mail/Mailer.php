@@ -7,6 +7,9 @@ use PortoSender\Postage\PostageProduct;
 
 final class Mailer implements MailerInterface
 {
+    /** Display format for the retrieval time (rendered in the site timezone via wp_date). */
+    private const TIME_FORMAT = 'd.m.Y H:i';
+
     public function __construct(private Settings $settings) {}
 
     public function sendConfirmation(string $email, string $name, string $confirmUrl): bool
@@ -65,7 +68,8 @@ final class Mailer implements MailerInterface
     public function sendAdminNotification(string $to, array $data): bool
     {
         $requesters = $this->normalizeRequesters($data);
-        $first = $requesters[0] ?? ['name' => '', 'email' => ''];
+        $first = $requesters[0] ?? ['name' => '', 'email' => '', 'time' => 0];
+        $firstTime = (int) ($first['time'] ?? 0);
 
         $vars = [
             '%product%' => (string) $data['product_label'],
@@ -73,6 +77,10 @@ final class Mailer implements MailerInterface
             '%remaining%' => (string) (int) $data['remaining'],
             '%name%' => $first['name'],
             '%email%' => $first['email'],
+            '%time%' => $firstTime > 0 ? wp_date(self::TIME_FORMAT, $firstTime) : '',
+            // First claimant as "Name <email> (time)" — resolved via strtr (single-pass), so a
+            // claimant's own name can never inject another placeholder token into the mail.
+            '%claimant%' => $this->formatRequester($first),
             '%requests%' => implode("\n", array_map(
                 fn (array $r): string => '- ' . $this->formatRequester($r),
                 $requesters
@@ -85,7 +93,8 @@ final class Mailer implements MailerInterface
         // templates may reference %name%/%email% or %requests% directly.
         $defaultBody = EmailDefaults::get('email_admin_body');
         if (count($requesters) === 1) {
-            $defaultBody .= __("\n\nAnfrage von: %name% <%email%>", 'wp-porto-sender');
+            // %claimant% carries the name/email and, when present, the retrieval time.
+            $defaultBody .= __("\n\nAnfrage von: %claimant%", 'wp-porto-sender');
         } elseif (count($requesters) > 1) {
             $defaultBody .= __("\n\nAnfragen:\n%requests%", 'wp-porto-sender');
         }
@@ -112,7 +121,7 @@ final class Mailer implements MailerInterface
                 $name = trim((string) ($r['name'] ?? ''));
                 $email = trim((string) ($r['email'] ?? ''));
                 if ($name !== '' || $email !== '') {
-                    $out[] = ['name' => $name, 'email' => $email];
+                    $out[] = ['name' => $name, 'email' => $email, 'time' => (int) ($r['time'] ?? 0)];
                 }
             }
             return $out;
@@ -120,20 +129,24 @@ final class Mailer implements MailerInterface
         $name = trim((string) ($data['name'] ?? ''));
         $email = trim((string) ($data['email'] ?? ''));
         if ($name !== '' && $email !== '') {
-            $out[] = ['name' => $name, 'email' => $email];
+            $out[] = ['name' => $name, 'email' => $email, 'time' => (int) ($data['time'] ?? 0)];
         }
         return $out;
     }
 
-    /** "Name <email>", degrading to whichever side is present. */
+    /** "Name <email> (dd.mm.yyyy hh:mm)", degrading to whichever parts are present. */
     private function formatRequester(array $r): string
     {
         $name = (string) ($r['name'] ?? '');
         $email = (string) ($r['email'] ?? '');
-        if ($name !== '' && $email !== '') {
-            return $name . ' <' . $email . '>';
+        $base = ($name !== '' && $email !== '')
+            ? $name . ' <' . $email . '>'
+            : ($email !== '' ? $email : $name);
+        $time = (int) ($r['time'] ?? 0);
+        if ($time > 0) {
+            $base .= ' (' . wp_date(self::TIME_FORMAT, $time) . ')';
         }
-        return $email !== '' ? $email : $name;
+        return $base;
     }
 
     /**

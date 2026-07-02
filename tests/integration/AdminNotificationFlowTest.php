@@ -70,6 +70,9 @@ final class AdminNotificationFlowTest extends PortoTestCase
         $this->assertCount(1, $adminMails, 'exactly one admin notification expected');
         $mail = array_values($adminMails)[0];
         $this->assertStringContainsString('Porto abgerufen', (string) $mail['subject']);
+        // Default now ships Name/E-Mail, and confirm() passes the retrieval time through.
+        $this->assertStringContainsString('Anfrage von: Vera <v@example.de>', (string) $mail['message']);
+        $this->assertMatchesRegularExpression('/\(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}\)/', (string) $mail['message'], 'retrieval time shown');
     }
 
     public function test_batch_admin_notification_lists_every_claimant(): void

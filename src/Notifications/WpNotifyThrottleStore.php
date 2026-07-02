@@ -16,6 +16,7 @@ final class WpNotifyThrottleStore implements NotifyThrottleStore
 {
     public const PENDING_OPTION = 'porto_notify_pending';
     public const REQUESTERS_OPTION = 'porto_notify_pending_requesters';
+    public const CONTEXT_OPTION = 'porto_notify_pending_context';
     public const COOLDOWN_TRANSIENT = 'porto_notify_cooldown';
 
     public function pending(): int
@@ -37,7 +38,11 @@ final class WpNotifyThrottleStore implements NotifyThrottleStore
         $out = [];
         foreach ($stored as $r) {
             if (is_array($r)) {
-                $out[] = ['name' => (string) ($r['name'] ?? ''), 'email' => (string) ($r['email'] ?? '')];
+                $out[] = [
+                    'name' => (string) ($r['name'] ?? ''),
+                    'email' => (string) ($r['email'] ?? ''),
+                    'time' => (int) ($r['time'] ?? 0),
+                ];
             }
         }
         return $out;
@@ -50,6 +55,30 @@ final class WpNotifyThrottleStore implements NotifyThrottleStore
             return;
         }
         update_option(self::REQUESTERS_OPTION, array_values($requesters), false);
+    }
+
+    public function pendingContext(): ?array
+    {
+        $stored = get_option(self::CONTEXT_OPTION, null);
+        if (!is_array($stored)) {
+            return null;
+        }
+        return [
+            'product_label' => (string) ($stored['product_label'] ?? ''),
+            'remaining' => (int) ($stored['remaining'] ?? 0),
+        ];
+    }
+
+    public function setPendingContext(?array $ctx): void
+    {
+        if ($ctx === null) {
+            delete_option(self::CONTEXT_OPTION);
+            return;
+        }
+        update_option(self::CONTEXT_OPTION, [
+            'product_label' => (string) ($ctx['product_label'] ?? ''),
+            'remaining' => (int) ($ctx['remaining'] ?? 0),
+        ], false);
     }
 
     public function coolingDown(): bool
