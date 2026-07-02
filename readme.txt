@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.5.2
+Stable tag: 0.5.3
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.5.3 =
+* Fix: the built-in "Bitte E-Mail bestätigen" and result pages showed the theme's header and footer but no message on sites where a plugin disables the block editor. The message now renders directly, independently of block rendering.
+* Clearer default wording on those pages ("Wir haben deine Anfrage erhalten …" / "Du hast deine Mail-Adresse erfolgreich bestätigt …"). All of these texts remain editable under Porto-Sender → Seiten.
 
 = 0.5.2 =
 * Fix: the built-in "Bitte E-Mail bestätigen" and result pages rendered without the theme's header, navigation and footer on block themes (the current WordPress default) — they now render fully inside the active theme.
