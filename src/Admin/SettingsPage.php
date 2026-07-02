@@ -5,6 +5,7 @@ namespace PortoSender\Admin;
 use PortoSender\Mail\EmailDefaults;
 use PortoSender\Settings\Settings;
 use PortoSender\Postage\ProductCatalog;
+use PortoSender\Frontend\PageProvisioner;
 
 final class SettingsPage
 {
@@ -255,6 +256,8 @@ final class SettingsPage
             'show_option_none' => __('— Plugin-Standard —', 'wp-porto-sender'),
             'option_none_value' => '0',
             'selected' => $selected,
+            // Don't offer the plugin's own auto-provisioned pages as an override choice.
+            'exclude' => implode(',', array_filter(PageProvisioner::ids())),
         ]);
         echo '</label></p>';
     }

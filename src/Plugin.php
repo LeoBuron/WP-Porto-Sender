@@ -16,7 +16,7 @@ use PortoSender\Notifications\{AdminNotifier, WpNotifyThrottleStore};
 use PortoSender\Geo\{GeoGate, GeoProviderFactory};
 use PortoSender\Issuance\{IssuanceService, UrlConfirmLinkBuilder};
 use PortoSender\Rest\RestController;
-use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar, PageRenderer};
+use PortoSender\Frontend\{RequestForm, ConfirmHandler, BlockRegistrar, PageRenderer, PageProvisioner};
 use PortoSender\Admin\{SettingsPage, CodeIntakePage, Dashboard, ToolsPage};
 use PortoSender\Cron\Maintenance;
 
@@ -84,6 +84,10 @@ final class Plugin
             // update path via GitHub Releases), so run any pending schema migration on the
             // first admin load after an update. run() is version-gated → no-op once current.
             (new SchemaVersion())->run($wpdb);
+            // Ensure the built-in "sent"/"result" views are backed by real pages. Runs here
+            // too (not only on activation) because GitHub-Release auto-updates never fire the
+            // activation hook; idempotent and cheap, so it self-heals on any admin load.
+            (new PageProvisioner($s))->ensure();
             (new SettingsPage())->register();
             (new CodeIntakePage($codes, $catalog))->register();
             (new Dashboard($codes, $s))->register();
@@ -119,10 +123,17 @@ final class Plugin
         if (!wp_next_scheduled(Maintenance::HOOK)) {
             wp_schedule_event(time() + 3600, 'daily', Maintenance::HOOK);
         }
+
+        // Back the built-in "sent"/"result" views with real pages from the first load.
+        (new PageProvisioner(Settings::fromOption()))->ensure();
     }
 
     public static function deactivate(): void
     {
         wp_clear_scheduled_hook(Maintenance::HOOK);
+        // Hide (don't delete) the auto-provisioned pages while inactive: their noindex/menu/
+        // sitemap-exclusion filters only run when the plugin is active, so leaving them
+        // published would expose two thin utility pages to search. ensure() republishes them.
+        PageProvisioner::unpublish();
     }
 }

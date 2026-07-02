@@ -21,6 +21,21 @@ final class PageRenderer
     {
         add_action('template_redirect', [$this, 'maybeRenderBuiltIn']);
         add_filter('the_content', [$this, 'maybeInjectIntoPage']);
+        // Keep the plugin's auto-provisioned utility pages out of search, menus and sitemap.
+        add_filter('wp_robots', [$this, 'noindexAutoPages']);
+        add_filter('wp_list_pages_excludes', [$this, 'excludeAutoPagesFromMenus']);
+        add_filter('wp_sitemaps_posts_query_args', [$this, 'excludeAutoPagesFromSitemap'], 10, 2);
+    }
+
+    /**
+     * The page that backs a view: the admin's published override if set, else the
+     * plugin's auto-provisioned page, else 0 (callers fall back to the built-in themed
+     * document). Every URL-building and render decision funnels through this one rule.
+     */
+    public static function effectivePageId(string $view, Settings $settings): int
+    {
+        $override = self::resolvePageId($view === 'result' ? $settings->pageResult() : $settings->pageSent());
+        return $override > 0 ? $override : PageProvisioner::autoPageId($view);
     }
 
     /** Map an issuance status to its (settings-editable) visitor message; unknown → invalid_token (allow-list). */
@@ -45,15 +60,31 @@ final class PageRenderer
     {
         $view = isset($_GET['porto_view'])
             ? sanitize_key((string) wp_unslash($_GET['porto_view'])) : '';
+        if ($view !== 'sent' && $view !== 'result') { return; }
 
-        if ($view === 'sent') {
-            if (self::resolvePageId($this->settings->pageSent()) > 0) { return; }
-            $this->renderThemed($this->sentMessage());
+        $pageId = self::effectivePageId($view, $this->settings);
+
+        // No real page backs this view (provisioning failed, or the pages were deleted):
+        // fall back to the self-contained themed document. renderThemed() echoes and exits.
+        if ($pageId === 0) {
+            $this->renderThemed($view === 'sent'
+                ? $this->sentMessage() : $this->message($this->requestedStatus()));
+            return;
         }
 
-        if ($view === 'result') {
-            if (self::resolvePageId($this->settings->pageResult()) > 0) { return; }
-            $this->renderThemed($this->message($this->requestedStatus()));
+        // A real page backs the view. If we are already on it, let WordPress render it
+        // through the theme and maybeInjectIntoPage() adds the notice. Otherwise this is a
+        // legacy/bookmarked ?porto_view link that landed on the site home — redirect the
+        // visitor onto the real page, carrying the query args the injection keys off.
+        // Gated to the home/front request so it can never loop (on the target queried===pageId).
+        $queried = get_queried_object_id();
+        if ($queried === $pageId) { return; }
+        if (is_front_page() || is_home() || $queried === 0) {
+            $target = $view === 'sent'
+                ? add_query_arg('porto_view', 'sent', get_permalink($pageId))
+                : add_query_arg('porto_status', $this->requestedStatus(), get_permalink($pageId));
+            wp_safe_redirect($target);
+            exit;
         }
     }
 
@@ -66,21 +97,63 @@ final class PageRenderer
     public function maybeInjectIntoPage(string $content): string
     {
         if (!is_singular() || !in_the_loop() || !is_main_query()) { return $content; }
+
+        // Gate on the flow's query args BEFORE resolving any page id, so an ordinary
+        // singular render does zero extra work (as the old resolvePageId(0) short-circuit did).
+        $view = isset($_GET['porto_view'])
+            ? sanitize_key((string) wp_unslash($_GET['porto_view'])) : '';
+        $hasStatus = isset($_GET['porto_status']);
+        if ($view !== 'sent' && !$hasStatus) { return $content; }
+
         $current = get_queried_object_id();
 
-        $sentPage = self::resolvePageId($this->settings->pageSent());
-        if ($sentPage > 0 && $current === $sentPage
-            && isset($_GET['porto_view'])
-            && sanitize_key((string) wp_unslash($_GET['porto_view'])) === 'sent') {
-            return $this->notice($this->sentMessage()) . $content;
+        if ($view === 'sent') {
+            $sentPage = self::effectivePageId('sent', $this->settings);
+            if ($sentPage > 0 && $current === $sentPage) {
+                return $this->notice($this->sentMessage()) . $content;
+            }
         }
 
-        $resultPage = self::resolvePageId($this->settings->pageResult());
-        if ($resultPage > 0 && $current === $resultPage && isset($_GET['porto_status'])) {
-            return $this->notice($this->message($this->requestedStatus())) . $content;
+        if ($hasStatus) {
+            $resultPage = self::effectivePageId('result', $this->settings);
+            if ($resultPage > 0 && $current === $resultPage) {
+                return $this->notice($this->message($this->requestedStatus())) . $content;
+            }
         }
 
         return $content;
+    }
+
+    /** wp_robots: mark the plugin's own utility pages noindex/nofollow. */
+    public function noindexAutoPages(array $robots): array
+    {
+        $ids = PageProvisioner::ids();
+        $current = get_queried_object_id();
+        if ($current > 0 && ($current === $ids['sent'] || $current === $ids['result'])) {
+            $robots['noindex'] = true;
+            $robots['nofollow'] = true;
+            unset($robots['index'], $robots['follow']);
+        }
+        return $robots;
+    }
+
+    /** wp_list_pages_excludes: drop the utility pages from wp_list_pages()/wp_page_menu(). */
+    public function excludeAutoPagesFromMenus(array $excludes): array
+    {
+        foreach (PageProvisioner::ids() as $id) {
+            if ($id > 0) { $excludes[] = $id; }
+        }
+        return $excludes;
+    }
+
+    /** wp_sitemaps_posts_query_args: drop the utility pages from the core XML sitemap. */
+    public function excludeAutoPagesFromSitemap(array $args, string $postType): array
+    {
+        if ($postType !== 'page') { return $args; }
+        foreach (PageProvisioner::ids() as $id) {
+            if ($id > 0) { $args['post__not_in'][] = $id; }
+        }
+        return $args;
     }
 
     /**

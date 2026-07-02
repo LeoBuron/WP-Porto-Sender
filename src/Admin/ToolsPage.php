@@ -11,6 +11,7 @@ use PortoSender\Persistence\SchemaVersion;
 use PortoSender\Portability\ExportService;
 use PortoSender\Portability\ImportService;
 use PortoSender\Lifecycle\DataEraser;
+use PortoSender\Frontend\PageProvisioner;
 use PortoSender\Cron\Maintenance;
 
 /**
@@ -118,6 +119,10 @@ final class ToolsPage
         if (!wp_next_scheduled(Maintenance::HOOK)) {
             wp_schedule_event(time() + 3600, 'daily', Maintenance::HOOK);
         }
+
+        // purgeAll() deleted the auto-provisioned pages; a clean-slate re-init is NOT an
+        // uninstall, so recreate them immediately (mirrors the cron re-arm above).
+        (new PageProvisioner(Settings::fromOption()))->ensure();
     }
 
     // ---------- admin-post handlers (thin, guarded) ----------

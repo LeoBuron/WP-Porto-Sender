@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace PortoSender\Lifecycle;
 
+use PortoSender\Frontend\PageProvisioner;
 use PortoSender\Persistence\Schema;
 use PortoSender\Persistence\SchemaVersion;
 use PortoSender\Settings\Settings;
@@ -50,6 +51,10 @@ final class DataEraser
             $like = $wpdb->esc_like($prefix) . '%';
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $like));
         }
+
+        // Auto-provisioned "sent"/"result" pages: force-delete via their ownership meta
+        // (safe — never touches admin-authored pages) and drop the ID map option.
+        PageProvisioner::purge();
 
         // Cron: a Delete-without-deactivate never runs Plugin::deactivate().
         wp_clear_scheduled_hook(Maintenance::HOOK);
