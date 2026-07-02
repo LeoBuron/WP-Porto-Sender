@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.5.0
+Stable tag: 0.5.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.5.1 =
+* The automatic e-mail messages (subject and text) now show their built-in default wording in every box, so you can adjust them directly instead of starting from an empty field. Clearing a field restores the default on the next save.
+* The texts of the built-in "Bitte E-Mail bestätigen" and result pages are now editable under Porto-Sender → Seiten, each pre-filled with its default text.
 
 = 0.5.0 =
 * Settings reorganised into tabs (Allgemein, Formular & Layout, Seiten, E-Mails, Missbrauchsschutz, Daten & Aufbewahrung, Geo) for a clearer, less cluttered admin.
