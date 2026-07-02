@@ -127,14 +127,15 @@ final class PageRenderer
      */
     private function themedDocument(string $message): string
     {
-        $notice = $this->notice($message);
+        // A plain, self-contained container centred with inline styles — deliberately NO
+        // do_blocks()/block markup: a plugin that disables or filters block rendering (the
+        // production site runs feature-disabling plugins) could blank a do_blocks() wrapper,
+        // which showed as a page with the theme header/footer but no content. block_header_area()
+        // /block_footer_area() render the template parts directly and are unaffected.
+        $main = '<main class="porto-page" style="max-width:640px;margin:0 auto;padding:clamp(2rem,6vw,4rem) 1.25rem;">'
+            . $this->notice($message) . '</main>';
         ob_start();
         if (wp_is_block_theme()) {
-            $main = do_blocks(
-                '<!-- wp:group {"tagName":"main","layout":{"type":"constrained"}} -->'
-                . '<main class="wp-block-group porto-page">' . $notice . '</main>'
-                . '<!-- /wp:group -->'
-            );
             ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -154,7 +155,7 @@ final class PageRenderer
             <?php
         } else {
             get_header();
-            echo '<main class="porto-page">' . $notice . '</main>';
+            echo $main;
             get_footer();
         }
         return (string) ob_get_clean();

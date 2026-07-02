@@ -133,12 +133,12 @@ final class PageTextsTest extends PortoTestCase
     {
         // Real sanitize_text_field runs here — the normalisation must still recognise the
         // default so a plain "save" never freezes the shipped copy into the option.
-        $this->saveSettings(['text_status_issued' => 'Dein Porto-Code wurde dir per E-Mail zugeschickt.']);
+        $default = Settings::TEXT_DEFAULTS['text_status_issued'];
+        $this->saveSettings(['text_status_issued' => $default]);
         $stored = get_option(Settings::OPTION);
         $this->assertSame('', $stored['text_status_issued'], 'unchanged default must normalise to empty');
         // …and the effective text is still the default via the accessor.
-        $this->assertSame('Dein Porto-Code wurde dir per E-Mail zugeschickt.',
-            Settings::fromOption()->text('text_status_issued'));
+        $this->assertSame($default, Settings::fromOption()->text('text_status_issued'));
     }
 
     public function test_email_body_default_round_trips_to_empty_under_real_sanitizers(): void

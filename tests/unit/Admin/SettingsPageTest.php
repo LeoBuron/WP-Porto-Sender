@@ -119,11 +119,11 @@ final class SettingsPageTest extends WpUnitTestCase
 
         // The sent notice + all six result-status texts are editable and prefilled.
         $this->assertStringContainsString('porto_sender_settings[text_page_sent]', $html);
-        $this->assertStringContainsString('value="Bitte bestätige die Anfrage über den Link in deiner E-Mail."', $html);
+        $this->assertStringContainsString('value="' . Settings::TEXT_DEFAULTS['text_page_sent'] . '"', $html);
         foreach (['issued', 'already_issued', 'expired', 'out_of_stock', 'email_failed', 'invalid_token'] as $status) {
             $this->assertStringContainsString('porto_sender_settings[text_status_' . $status . ']', $html);
         }
-        $this->assertStringContainsString('value="Dein Porto-Code wurde dir per E-Mail zugeschickt."', $html);
+        $this->assertStringContainsString('value="' . Settings::TEXT_DEFAULTS['text_status_issued'] . '"', $html);
     }
 
     public function test_enqueues_color_picker_only_on_settings_page(): void

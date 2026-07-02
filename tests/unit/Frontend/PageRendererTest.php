@@ -43,7 +43,6 @@ final class PageRendererTest extends WpUnitTestCase
         // be used (they fall back to the bare theme-compat page). We assemble the document
         // from the block header/footer areas instead.
         Functions\when('wp_is_block_theme')->justReturn(true);
-        Functions\when('do_blocks')->returnArg(1);
         Functions\when('language_attributes')->justReturn(null);
         Functions\when('bloginfo')->justReturn(null);
         Functions\when('body_class')->justReturn(null);
@@ -77,7 +76,7 @@ final class PageRendererTest extends WpUnitTestCase
     public function test_known_statuses_map_to_their_messages(): void
     {
         $r = $this->renderer();
-        $this->assertSame('Dein Porto-Code wurde dir per E-Mail zugeschickt.', $r->message('issued'));
+        $this->assertSame(Settings::TEXT_DEFAULTS['text_status_issued'], $r->message('issued'));
         $this->assertSame('Du hast deinen Porto-Code bereits erhalten.', $r->message('already_issued'));
         $this->assertStringContainsString('abgelaufen', $r->message('expired'));
         $this->assertStringContainsString('keine Codes', $r->message('out_of_stock'));
@@ -126,7 +125,7 @@ final class PageRendererTest extends WpUnitTestCase
         $_GET['porto_status'] = 'issued';
 
         $out = $this->renderer(['page_result' => 42])->maybeInjectIntoPage('<p>Seiteninhalt</p>');
-        $this->assertStringContainsString('Dein Porto-Code wurde dir per E-Mail zugeschickt.', $out);
+        $this->assertStringContainsString(Settings::TEXT_DEFAULTS['text_status_issued'], $out);
         $this->assertStringContainsString('<p>Seiteninhalt</p>', $out);
         // Notice is prepended (comes before the original body).
         $this->assertLessThan(strpos($out, 'Seiteninhalt'), strpos($out, 'porto-notice'));
@@ -142,7 +141,7 @@ final class PageRendererTest extends WpUnitTestCase
         $_GET['porto_view'] = 'sent';
 
         $out = $this->renderer(['page_sent' => 7])->maybeInjectIntoPage('<p>Body</p>');
-        $this->assertStringContainsString('bestätige die Anfrage', $out);
+        $this->assertStringContainsString(Settings::TEXT_DEFAULTS['text_page_sent'], $out);
     }
 
     public function test_unknown_injected_status_is_allowlisted_to_invalid_token(): void
