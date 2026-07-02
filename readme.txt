@@ -4,7 +4,7 @@ Tags: deutsche post, briefmarke, postage, dsgvo, datenschutz
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.5.4
+Stable tag: 0.6.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Once installed, new versions published on GitHub Releases appear as normal plugi
 WordPress admin.
 
 == Changelog ==
+
+= 0.6.0 =
+* New: a "Beispiel-CSV herunterladen" button under Codes hinzufügen provides a ready-made example file for the CSV code import, so the expected format (columns product, code and the optional purchase_date) is clear at a glance. The example is built from your configured products, so it never contains an invalid product key.
+* The request form now points to the specific field that needs attention instead of the generic "Bitte fülle alle Felder korrekt aus": the affected field (name, e-mail, product or consent) is highlighted and focused with its own message. A mistyped address such as "name@domain" — which the browser's own check lets through — is now caught with a clear hint before sending.
 
 = 0.5.4 =
 * Fix: the built-in "Bitte E-Mail bestätigen" and result pages could show the theme's header but no content or footer on sites running caching/optimisation plugins, because those pages were assembled as a stand-alone document unlike every other page. They now render through real WordPress pages that the plugin creates automatically, using the same theme pipeline as the rest of the site. Choosing your own pages under Porto-Sender → Seiten still overrides them; the built-in stand-alone document remains only as a last-resort fallback.
